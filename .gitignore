@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+logs/
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/
+
+# Generated Prisma client
+src/generated/prisma/
+
+# Local database files
+*.db
+*.db-journal
