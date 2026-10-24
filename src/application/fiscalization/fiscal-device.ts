@@ -1,7 +1,6 @@
-
 import type {
-    FiscalizationFailure,
-    FiscalReceipt,
+  FiscalizationFailure,
+  FiscalReceipt,
 } from "../../domain/fiscalization/fiscalization-record.js";
 
 /**
@@ -17,18 +16,18 @@ import type {
  * A timeout must not automatically be reported as "failed".
  */
 export type FiscalDeviceResult =
-    | {
-    readonly kind: "succeeded";
-    readonly receipt: FiscalReceipt;
-}
-    | {
-    readonly kind: "failed";
-    readonly failure: FiscalizationFailure;
-}
-    | {
-    readonly kind: "outcome-unknown";
-    readonly reason: string;
-};
+  | {
+      readonly kind: "succeeded";
+      readonly receipt: FiscalReceipt;
+    }
+  | {
+      readonly kind: "failed";
+      readonly failure: FiscalizationFailure;
+    }
+  | {
+      readonly kind: "outcome-unknown";
+      readonly reason: string;
+    };
 
 /**
  * Contract for communicating with the fiscal device.
@@ -40,11 +39,11 @@ export type FiscalDeviceResult =
  * confirming the Zoho invoice fields and the relevant device commands.
  */
 export interface FiscalDevice {
-    /**
-     * Executes one fiscal receipt operation.
-     *
-     * Implementations must serialize device commands and must not blindly
-     * retry a command if its outcome could be uncertain.
-     */
-    issueReceipt(): Promise<FiscalDeviceResult>;
+  /**
+   * Executes one fiscal receipt operation.
+   *
+   * Implementations must serialize device commands and must not blindly
+   * retry a command if its outcome could be uncertain.
+   */
+  issueReceipt(): Promise<FiscalDeviceResult>;
 }
