@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const envSchema = z
+export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     DATABASE_PROVIDER: z.enum(["postgresql", "sqlserver"]).default("postgresql"),
@@ -19,6 +19,17 @@ const envSchema = z
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
       .default("info"),
+
+    // Zoho Books OAuth credentials remain optional during development.
+    // If provided, each credential must contain a non-whitespace value.
+    ZOHO_CLIENT_ID: z.string().trim().min(1).optional(),
+    ZOHO_CLIENT_SECRET: z.string().trim().min(1).optional(),
+
+    // Must exactly match the redirect URI registered in Zoho API Console.
+    ZOHO_REDIRECT_URI: z.string().url().default("http://localhost:3000/integrations/zoho/callback"),
+
+    // Default to the US data center; configure the correct region for your account.
+    ZOHO_ACCOUNTS_URL: z.string().url().default("https://accounts.zoho.com"),
   })
   .superRefine((value, context) => {
     if (value.DATABASE_PROVIDER === "postgresql" && !value.DATABASE_URL?.trim()) {
@@ -45,6 +56,19 @@ const envSchema = z
         }
       }
     }
+
+    // OAuth must have both credentials or neither.
+    const hasClientId = Boolean(value.ZOHO_CLIENT_ID);
+    const hasClientSecret = Boolean(value.ZOHO_CLIENT_SECRET);
+
+    if (hasClientId !== hasClientSecret) {
+      context.addIssue({
+        code: "custom",
+        path: [hasClientId ? "ZOHO_CLIENT_SECRET" : "ZOHO_CLIENT_ID"],
+        message: "ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET must be configured together",
+      });
+    }
   });
 
+// Validate the real process environment when the application starts.
 export const env = envSchema.parse(process.env);
