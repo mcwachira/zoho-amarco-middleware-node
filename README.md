@@ -46,21 +46,23 @@ The middleware is designed to run on a customer's Windows or Linux server, depen
 
 ## Project Status
 
-| Capability | Status |
-|---|---|
-| TypeScript application foundation | Implemented |
-| Express API and health endpoints | Implemented |
-| Fiscalization domain and application service | Implemented |
-| PostgreSQL repository | Implemented and integration-tested |
-| SQL Server repository | Implemented; automated repository tests exist |
-| Prisma schemas for both database providers | Implemented |
-| PostgreSQL Docker Compose configuration | Implemented |
-| Tremol ZFP Lab Server client foundation | Implemented; hardware protocol still requires verification |
-| Zoho Books OAuth 2.0 | Planned |
-| Zoho Books invoice retrieval | Planned |
-| Verified G03 receipt issuance | Pending device/SDK/protocol verification |
-| KRA/eTIMS integration | Pending verification of the applicable API and compliance requirements |
-| Production deployment and operational hardening | Pending |
+| Capability                                      | Status                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| TypeScript application foundation               | Implemented                                                            |
+| Express API and health endpoints                | Implemented                                                            |
+| Fiscalization domain and application service    | Implemented                                                            |
+| PostgreSQL repository                           | Implemented and integration-tested                                     |
+| SQL Server repository                           | Implemented; automated repository tests exist                          |
+| Prisma schemas for both database providers      | Implemented                                                            |
+| PostgreSQL Docker Compose configuration         | Implemented                                                            |
+| Tremol ZFP Lab Server client foundation         | Implemented; hardware protocol still requires verification             |
+| Zoho Books OAuth environment configuration      | Implemented and unit-tested                                            |
+| Zoho Books authorization and callback handling  | Planned                                                                |
+| Zoho Books invoice retrieval                    | Planned                                                                |
+| Secure token storage and refresh                | Planned                                                                |
+| Verified G03 receipt issuance                   | Pending device/SDK/protocol verification                               |
+| KRA/eTIMS integration                           | Pending verification of the applicable API and compliance requirements |
+| Production deployment and operational hardening | Pending                                                                |
 
 These statuses describe the current repository, not a claim of certification or successful live fiscalization.
 
@@ -254,43 +256,60 @@ The following variables are currently defined by the application and database co
 
 ### General settings
 
-| Variable | Purpose |
-|---|---|
-| `NODE_ENV` | Runtime environment: `development`, `test`, or `production` |
-| `PORT` | HTTP port; defaults to `3000` |
-| `LOG_LEVEL` | Logging threshold; defaults to `info` |
+| Variable            | Purpose                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| `NODE_ENV`          | Runtime environment: `development`, `test`, or `production`   |
+| `PORT`              | HTTP port; defaults to `3000`                                 |
+| `LOG_LEVEL`         | Logging threshold; defaults to `info`                         |
 | `DATABASE_PROVIDER` | Selects `postgresql` or `sqlserver`; defaults to `postgresql` |
-| `DATABASE_URL` | PostgreSQL connection URL and Prisma datasource URL |
+| `DATABASE_URL`      | PostgreSQL connection URL and Prisma datasource URL           |
 
 ### PostgreSQL settings
 
 The Compose configuration uses:
 
-| Variable | Purpose |
-|---|---|
-| `POSTGRES_USER` | Local PostgreSQL username |
-| `POSTGRES_PASSWORD` | Local PostgreSQL password |
-| `POSTGRES_DB` | Local PostgreSQL database name |
+| Variable            | Purpose                        |
+| ------------------- | ------------------------------ |
+| `POSTGRES_USER`     | Local PostgreSQL username      |
+| `POSTGRES_PASSWORD` | Local PostgreSQL password      |
+| `POSTGRES_DB`       | Local PostgreSQL database name |
 
 `DATABASE_URL` must also be set for the application and Prisma commands that need to connect to PostgreSQL.
 
 ### SQL Server settings
 
-| Variable | Purpose |
-|---|---|
-| `SQLSERVER_SERVER` | SQL Server hostname or address |
-| `SQLSERVER_DATABASE` | Database name |
-| `SQLSERVER_USER` | Database login |
-| `SQLSERVER_PASSWORD` | Database password |
-| `SQLSERVER_PORT` | Port; defaults to `1433` |
-| `SQLSERVER_ENCRYPT` | Enables or disables connection encryption; defaults to `true` |
-| `SQLSERVER_TRUST_SERVER_CERTIFICATE` | Controls certificate trust behavior; defaults to `false` |
+| Variable                             | Purpose                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `SQLSERVER_SERVER`                   | SQL Server hostname or address                                |
+| `SQLSERVER_DATABASE`                 | Database name                                                 |
+| `SQLSERVER_USER`                     | Database login                                                |
+| `SQLSERVER_PASSWORD`                 | Database password                                             |
+| `SQLSERVER_PORT`                     | Port; defaults to `1433`                                      |
+| `SQLSERVER_ENCRYPT`                  | Enables or disables connection encryption; defaults to `true` |
+| `SQLSERVER_TRUST_SERVER_CERTIFICATE` | Controls certificate trust behavior; defaults to `false`      |
 
 The SQL Server connection settings are used by the SQL Server adapter. When selecting SQL Server, configure the Prisma schema and migration path for SQL Server as well; the root Prisma configuration defaults to PostgreSQL.
 
+### Zoho Books OAuth settings
+
+The application validates the following Zoho Books OAuth configuration variables. These settings establish the configuration foundation; they do not mean that the authorization flow or invoice API integration is already implemented.
+
+| Variable             | Purpose                                                                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ZOHO_CLIENT_ID`     | Client ID issued for the Zoho API application. Optional until OAuth is configured; if supplied, it must not be blank.                                                        |
+| `ZOHO_CLIENT_SECRET` | Client secret issued for the Zoho API application. Optional until OAuth is configured; if supplied, it must not be blank.                                                    |
+| `ZOHO_REDIRECT_URI`  | OAuth callback URI registered in the Zoho API Console. Defaults to `http://localhost:3000/integrations/zoho/callback`.                                                       |
+| `ZOHO_ACCOUNTS_URL`  | Zoho Accounts authorization server URL for the account's data center. Defaults to `https://accounts.zoho.com`; change it if your Zoho organization uses another data center. |
+
+The client ID and client secret must be configured together. The application rejects configurations in which only one credential is provided.
+
+The redirect URI must exactly match the URI registered in the Zoho API Console. The default localhost URI is intended for local development; production deployments must use the appropriate registered HTTPS callback.
+
+Do not commit actual credentials or include them in logs. OAuth authorization, callback validation, token exchange, token refresh, secure token persistence, and Zoho Books invoice retrieval remain separate implementation tasks.
+
 ### Local `.env` example
 
-This is a template, not a production credential set:
+The following is a development template, not a production credential set:
 
 ```dotenv
 NODE_ENV=development
@@ -304,11 +323,21 @@ POSTGRES_PASSWORD=replace_with_a_local_password
 POSTGRES_DB=zoho_amarco_dev
 
 DATABASE_URL=postgresql://zoho_amarco:replace_with_a_local_password@localhost:5438/zoho_amarco_dev
+
+# Optional until Zoho OAuth is configured.
+# Uncomment and replace both values when you are ready to configure OAuth.
+# ZOHO_CLIENT_ID=
+# ZOHO_CLIENT_SECRET=
+
+ZOHO_REDIRECT_URI=http://localhost:3000/integrations/zoho/callback
+ZOHO_ACCOUNTS_URL=https://accounts.zoho.com
 ```
 
-Replace the placeholder password with a URL-encoded value if it contains reserved URL characters. Keep the Compose variables and connection URL consistent.
+Replace the placeholder database password with a local development password. URL-encode reserved characters when placing a password in `DATABASE_URL`, and keep the Compose variables consistent with the connection URL.
 
-Zoho credentials are not part of the current configuration schema. They should be added when the OAuth implementation is designed, with secrets stored outside source control.
+The Zoho credential lines are intentionally commented out. The current environment schema permits the credentials to be omitted, but rejects blank values. When configuring OAuth, set both `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET` in your local `.env` file.
+
+Use the Accounts URL appropriate to your Zoho organization's data center. The default shown above is not a guarantee that every Zoho organization should use the US data center.
 
 ## Database Setup
 
@@ -408,9 +437,9 @@ Check the configured port and application logs if startup fails. Environment val
 
 The current Express application exposes these health endpoints:
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health/live` | Indicates that the application process is alive |
+| Endpoint            | Purpose                                                                    |
+| ------------------- | -------------------------------------------------------------------------- |
+| `GET /health/live`  | Indicates that the application process is alive                            |
 | `GET /health/ready` | Checks application readiness, including the configured database dependency |
 
 With the default port, test them using:
@@ -541,7 +570,7 @@ The integration should be developed incrementally.
 
 ### Phase 1: OAuth and configuration
 
-- Define Zoho Books OAuth configuration using validated environment variables.
+- Extend the implemented environment configuration into a complete Zoho Books OAuth integration.
 - Determine the applicable Zoho data center and API domain.
 - Implement authorization and callback handling.
 - Exchange authorization codes for tokens using the documented OAuth flow.
@@ -598,11 +627,11 @@ The following practices are required for production readiness:
 
 The repository uses the following branch model:
 
-| Branch | Purpose |
-|---|---|
-| `main` | Stable release baseline |
-| `dev` | Integration branch for tested work |
-| `feature/*` | Isolated feature development |
+| Branch      | Purpose                            |
+| ----------- | ---------------------------------- |
+| `main`      | Stable release baseline            |
+| `dev`       | Integration branch for tested work |
+| `feature/*` | Isolated feature development       |
 
 Create a feature branch from `dev`:
 
