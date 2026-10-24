@@ -46,21 +46,21 @@ The middleware is designed to run on a customer's Windows or Linux server, depen
 
 ## Project Status
 
-| Capability | Status |
-|---|---|
-| TypeScript application foundation | Implemented |
-| Express API and health endpoints | Implemented |
-| Fiscalization domain and application service | Implemented |
-| PostgreSQL repository | Implemented and integration-tested |
-| SQL Server repository | Implemented; automated repository tests exist |
-| Prisma schemas for both database providers | Implemented |
-| PostgreSQL Docker Compose configuration | Implemented |
-| Tremol ZFP Lab Server client foundation | Implemented; hardware protocol still requires verification |
-| Zoho Books OAuth 2.0 | Planned |
-| Zoho Books invoice retrieval | Planned |
-| Verified G03 receipt issuance | Pending device/SDK/protocol verification |
-| KRA/eTIMS integration | Pending verification of the applicable API and compliance requirements |
-| Production deployment and operational hardening | Pending |
+| Capability                                      | Status                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| TypeScript application foundation               | Implemented                                                            |
+| Express API and health endpoints                | Implemented                                                            |
+| Fiscalization domain and application service    | Implemented                                                            |
+| PostgreSQL repository                           | Implemented and integration-tested                                     |
+| SQL Server repository                           | Implemented; automated repository tests exist                          |
+| Prisma schemas for both database providers      | Implemented                                                            |
+| PostgreSQL Docker Compose configuration         | Implemented                                                            |
+| Tremol ZFP Lab Server client foundation         | Implemented; hardware protocol still requires verification             |
+| Zoho Books OAuth 2.0                            | Planned                                                                |
+| Zoho Books invoice retrieval                    | Planned                                                                |
+| Verified G03 receipt issuance                   | Pending device/SDK/protocol verification                               |
+| KRA/eTIMS integration                           | Pending verification of the applicable API and compliance requirements |
+| Production deployment and operational hardening | Pending                                                                |
 
 These statuses describe the current repository, not a claim of certification or successful live fiscalization.
 
@@ -254,37 +254,37 @@ The following variables are currently defined by the application and database co
 
 ### General settings
 
-| Variable | Purpose |
-|---|---|
-| `NODE_ENV` | Runtime environment: `development`, `test`, or `production` |
-| `PORT` | HTTP port; defaults to `3000` |
-| `LOG_LEVEL` | Logging threshold; defaults to `info` |
+| Variable            | Purpose                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| `NODE_ENV`          | Runtime environment: `development`, `test`, or `production`   |
+| `PORT`              | HTTP port; defaults to `3000`                                 |
+| `LOG_LEVEL`         | Logging threshold; defaults to `info`                         |
 | `DATABASE_PROVIDER` | Selects `postgresql` or `sqlserver`; defaults to `postgresql` |
-| `DATABASE_URL` | PostgreSQL connection URL and Prisma datasource URL |
+| `DATABASE_URL`      | PostgreSQL connection URL and Prisma datasource URL           |
 
 ### PostgreSQL settings
 
 The Compose configuration uses:
 
-| Variable | Purpose |
-|---|---|
-| `POSTGRES_USER` | Local PostgreSQL username |
-| `POSTGRES_PASSWORD` | Local PostgreSQL password |
-| `POSTGRES_DB` | Local PostgreSQL database name |
+| Variable            | Purpose                        |
+| ------------------- | ------------------------------ |
+| `POSTGRES_USER`     | Local PostgreSQL username      |
+| `POSTGRES_PASSWORD` | Local PostgreSQL password      |
+| `POSTGRES_DB`       | Local PostgreSQL database name |
 
 `DATABASE_URL` must also be set for the application and Prisma commands that need to connect to PostgreSQL.
 
 ### SQL Server settings
 
-| Variable | Purpose |
-|---|---|
-| `SQLSERVER_SERVER` | SQL Server hostname or address |
-| `SQLSERVER_DATABASE` | Database name |
-| `SQLSERVER_USER` | Database login |
-| `SQLSERVER_PASSWORD` | Database password |
-| `SQLSERVER_PORT` | Port; defaults to `1433` |
-| `SQLSERVER_ENCRYPT` | Enables or disables connection encryption; defaults to `true` |
-| `SQLSERVER_TRUST_SERVER_CERTIFICATE` | Controls certificate trust behavior; defaults to `false` |
+| Variable                             | Purpose                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `SQLSERVER_SERVER`                   | SQL Server hostname or address                                |
+| `SQLSERVER_DATABASE`                 | Database name                                                 |
+| `SQLSERVER_USER`                     | Database login                                                |
+| `SQLSERVER_PASSWORD`                 | Database password                                             |
+| `SQLSERVER_PORT`                     | Port; defaults to `1433`                                      |
+| `SQLSERVER_ENCRYPT`                  | Enables or disables connection encryption; defaults to `true` |
+| `SQLSERVER_TRUST_SERVER_CERTIFICATE` | Controls certificate trust behavior; defaults to `false`      |
 
 The SQL Server connection settings are used by the SQL Server adapter. When selecting SQL Server, configure the Prisma schema and migration path for SQL Server as well; the root Prisma configuration defaults to PostgreSQL.
 
@@ -408,9 +408,9 @@ Check the configured port and application logs if startup fails. Environment val
 
 The current Express application exposes these health endpoints:
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health/live` | Indicates that the application process is alive |
+| Endpoint            | Purpose                                                                    |
+| ------------------- | -------------------------------------------------------------------------- |
+| `GET /health/live`  | Indicates that the application process is alive                            |
 | `GET /health/ready` | Checks application readiness, including the configured database dependency |
 
 With the default port, test them using:
@@ -598,11 +598,11 @@ The following practices are required for production readiness:
 
 The repository uses the following branch model:
 
-| Branch | Purpose |
-|---|---|
-| `main` | Stable release baseline |
-| `dev` | Integration branch for tested work |
-| `feature/*` | Isolated feature development |
+| Branch      | Purpose                            |
+| ----------- | ---------------------------------- |
+| `main`      | Stable release baseline            |
+| `dev`       | Integration branch for tested work |
+| `feature/*` | Isolated feature development       |
 
 Create a feature branch from `dev`:
 
