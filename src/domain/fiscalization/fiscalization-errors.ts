@@ -5,20 +5,20 @@
  * domain failures from unexpected programming or infrastructure errors.
  */
 export class FiscalizationDomainError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "FiscalizationDomainError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "FiscalizationDomainError";
+  }
 }
 
 /**
  * Thrown when a requested status change violates the lifecycle rules.
  */
 export class InvalidFiscalizationTransitionError extends FiscalizationDomainError {
-    constructor(from: string, to: string) {
-        super(`Cannot transition fiscalization from "${from}" to "${to}".`);
-        this.name = "InvalidFiscalizationTransitionError";
-    }
+  constructor(from: string, to: string) {
+    super(`Cannot transition fiscalization from "${from}" to "${to}".`);
+    this.name = "InvalidFiscalizationTransitionError";
+  }
 }
 
 /**
@@ -27,8 +27,8 @@ export class InvalidFiscalizationTransitionError extends FiscalizationDomainErro
  * Example: attaching a receipt before the fiscal operation is confirmed.
  */
 export class InvalidFiscalizationOperationError extends FiscalizationDomainError {
-    constructor(message: string) {
-        super(message);
-        this.name = "InvalidFiscalizationOperationError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidFiscalizationOperationError";
+  }
 }

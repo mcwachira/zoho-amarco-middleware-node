@@ -2,3 +2,7 @@ node_modules/
 dist/
 coverage/
 pnpm-lock.yaml
+
+# Generated Prisma clients
+src/generated/prisma/
+prisma/src/generated/

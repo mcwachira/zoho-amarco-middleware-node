@@ -1,4 +1,3 @@
-
 import type { FiscalizationStatus } from "./status.js";
 
 /**
@@ -21,15 +20,12 @@ import type { FiscalizationStatus } from "./status.js";
  * `Record` ensures that every FiscalizationStatus has an entry.
  * `readonly` prevents us from modifying the allowed lists accidentally.
  */
-const allowedTransitions: Record<
-    FiscalizationStatus,
-    readonly FiscalizationStatus[]
-> = {
-    Pending: ["InProgress"],
-    InProgress: ["Succeeded", "Failed", "OutcomeUnknown"],
-    Succeeded: [],
-    Failed: [],
-    OutcomeUnknown: [],
+const allowedTransitions: Record<FiscalizationStatus, readonly FiscalizationStatus[]> = {
+  Pending: ["InProgress"],
+  InProgress: ["Succeeded", "Failed", "OutcomeUnknown"],
+  Succeeded: [],
+  Failed: [],
+  OutcomeUnknown: [],
 };
 
 /**
@@ -42,11 +38,8 @@ const allowedTransitions: Record<
  * @param to - The status we want to move to.
  * @returns true if the transition is allowed; otherwise false.
  */
-export function canTransition(
-    from: FiscalizationStatus,
-    to: FiscalizationStatus,
-): boolean {
-    // Get the allowed destination statuses for the current status,
-    // then check whether the requested destination is in that list.
-    return allowedTransitions[from].includes(to);
+export function canTransition(from: FiscalizationStatus, to: FiscalizationStatus): boolean {
+  // Get the allowed destination statuses for the current status,
+  // then check whether the requested destination is in that list.
+  return allowedTransitions[from].includes(to);
 }

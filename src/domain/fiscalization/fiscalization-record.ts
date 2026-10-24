@@ -7,11 +7,11 @@ import type { FiscalizationStatus } from "./status.js";
  * and confirming the actual response returned by ZFPLabServer.
  */
 export interface FiscalReceipt {
-    /** The receipt number confirmed by the fiscal device. */
-    readonly receiptNumber: string;
+  /** The receipt number confirmed by the fiscal device. */
+  readonly receiptNumber: string;
 
-    /** The date and time the receipt was issued, if confirmed. */
-    readonly issuedAt: Date;
+  /** The date and time the receipt was issued, if confirmed. */
+  readonly issuedAt: Date;
 }
 
 /**
@@ -21,11 +21,11 @@ export interface FiscalReceipt {
  * responses in this object.
  */
 export interface FiscalizationFailure {
-    /** A stable, machine-readable error code. */
-    readonly code: string;
+  /** A stable, machine-readable error code. */
+  readonly code: string;
 
-    /** A sanitized description suitable for application diagnostics. */
-    readonly message: string;
+  /** A sanitized description suitable for application diagnostics. */
+  readonly message: string;
 }
 
 /**
@@ -35,29 +35,28 @@ export interface FiscalizationFailure {
  * Prisma, Express, SQL Server, PostgreSQL, or the Tremol device SDK.
  */
 export interface FiscalizationRecord {
-    /** Our internal, unique identifier for this record. */
-    readonly id: string;
+  /** Our internal, unique identifier for this record. */
+  readonly id: string;
 
-    /** The stable invoice identifier received from Zoho Books. */
-    readonly zohoInvoiceId: string;
+  /** The stable invoice identifier received from Zoho Books. */
+  readonly zohoInvoiceId: string;
 
-    /** The current state of this fiscalization attempt. */
-    readonly status: FiscalizationStatus;
+  /** The current state of this fiscalization attempt. */
+  readonly status: FiscalizationStatus;
 
-    /** When our system created this record. */
-    readonly createdAt: Date;
+  /** When our system created this record. */
+  readonly createdAt: Date;
 
-    /** When this record was last updated. */
-    readonly updatedAt: Date;
+  /** When this record was last updated. */
+  readonly updatedAt: Date;
 
-    /** Receipt details, populated only after success is confirmed. */
-    readonly receipt: FiscalReceipt | null;
+  /** Receipt details, populated only after success is confirmed. */
+  readonly receipt: FiscalReceipt | null;
 
-    /** Failure details, populated when a failure is established. */
-    readonly failure: FiscalizationFailure | null;
+  /** Failure details, populated when a failure is established. */
+  readonly failure: FiscalizationFailure | null;
 
-
-    readonly outcomeUnknownReason: string | null;
+  readonly outcomeUnknownReason: string | null;
 }
 
 /**
@@ -67,8 +66,8 @@ export interface FiscalizationRecord {
  * the application layer without coupling the domain to a specific library.
  */
 export interface CreateFiscalizationRecordInput {
-    readonly id: string;
-    readonly zohoInvoiceId: string;
+  readonly id: string;
+  readonly zohoInvoiceId: string;
 }
 
 /**
@@ -78,32 +77,39 @@ export interface CreateFiscalizationRecordInput {
  * tests can provide a fixed date instead of depending on the real clock.
  */
 export function createFiscalizationRecord(
-    input: CreateFiscalizationRecordInput,
-    now: Date = new Date(),
+  input: CreateFiscalizationRecordInput,
+  now: Date = new Date(),
 ): FiscalizationRecord {
-    // Trim whitespace so values such as "   " cannot be accepted as IDs.
-    const id = input.id.trim();
-    const zohoInvoiceId = input.zohoInvoiceId.trim();
+  // Trim whitespace so values such as "   " cannot be accepted as IDs.
+  const id = input.id.trim();
+  const zohoInvoiceId = input.zohoInvoiceId.trim();
 
-    if (id.length === 0) {
-        throw new Error("Fiscalization record ID must not be empty.");
-    }
+  if (id.length === 0) {
+    throw new Error("Fiscalization record ID must not be empty.");
+  }
 
-    if (zohoInvoiceId.length === 0) {
-        throw new Error("Zoho invoice ID must not be empty.");
-    }
+  if (zohoInvoiceId.length === 0) {
+    throw new Error("Zoho invoice ID must not be empty.");
+  }
 
-    // Create one timestamp and use it consistently for both fields.
-    const timestamp = new Date(now.getTime());
+  // Create one timestamp and use it consistently for both fields.
+  // Reject invalid dates before they can enter the domain model.
+  if (Number.isNaN(now.getTime())) {
+    throw new Error("Fiscalization timestamp must be a valid date.");
+  }
 
-    return {
-        id,
-        zohoInvoiceId,
-        outcomeUnknownReason: null,
-        status: "Pending",
-        createdAt: timestamp,
-        updatedAt: new Date(timestamp.getTime()),
-        receipt: null,
-        failure: null,
-    };
+  // Copy the date so the record does not share a mutable Date object
+  // with the caller. Both timestamps represent the same instant.
+  const timestamp = new Date(now.getTime());
+
+  return {
+    id,
+    zohoInvoiceId,
+    outcomeUnknownReason: null,
+    status: "Pending",
+    createdAt: timestamp,
+    updatedAt: new Date(timestamp.getTime()),
+    receipt: null,
+    failure: null,
+  };
 }
