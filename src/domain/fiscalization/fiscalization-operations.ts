@@ -1,12 +1,12 @@
 import type {
-    FiscalizationFailure,
-    FiscalizationRecord,
-    FiscalReceipt,
+  FiscalizationFailure,
+  FiscalizationRecord,
+  FiscalReceipt,
 } from "./fiscalization-record.js";
 
 import {
-    InvalidFiscalizationOperationError,
-    InvalidFiscalizationTransitionError,
+  InvalidFiscalizationOperationError,
+  InvalidFiscalizationTransitionError,
 } from "./fiscalization-errors.js";
 
 import { canTransition } from "./status-transitions.js";
@@ -19,21 +19,18 @@ import { canTransition } from "./status-transitions.js";
  * safely and atomically in the database.
  */
 function transitionTo(
-    record: FiscalizationRecord,
-    nextStatus: FiscalizationRecord["status"],
+  record: FiscalizationRecord,
+  nextStatus: FiscalizationRecord["status"],
 ): FiscalizationRecord {
-    if (!canTransition(record.status, nextStatus)) {
-        throw new InvalidFiscalizationTransitionError(
-            record.status,
-            nextStatus,
-        );
-    }
+  if (!canTransition(record.status, nextStatus)) {
+    throw new InvalidFiscalizationTransitionError(record.status, nextStatus);
+  }
 
-    return {
-        ...record,
-        status: nextStatus,
-        updatedAt: new Date(),
-    };
+  return {
+    ...record,
+    status: nextStatus,
+    updatedAt: new Date(),
+  };
 }
 
 /**
@@ -43,10 +40,8 @@ function transitionTo(
  * separate workers from claiming the same database record concurrently.
  * We'll solve that later with an atomic database operation.
  */
-export function startFiscalization(
-    record: FiscalizationRecord,
-): FiscalizationRecord {
-    return transitionTo(record, "InProgress");
+export function startFiscalization(record: FiscalizationRecord): FiscalizationRecord {
+  return transitionTo(record, "InProgress");
 }
 
 /**
@@ -56,37 +51,34 @@ export function startFiscalization(
  * from a successful HTTP response or an assumed outcome.
  */
 export function completeFiscalization(
-    record: FiscalizationRecord,
-    receipt: FiscalReceipt,
+  record: FiscalizationRecord,
+  receipt: FiscalReceipt,
 ): FiscalizationRecord {
-    if (record.status !== "InProgress") {
-        throw new InvalidFiscalizationOperationError(
-            "Only an in-progress fiscalization can be completed.",
-        );
-    }
+  if (record.status !== "InProgress") {
+    throw new InvalidFiscalizationOperationError(
+      "Only an in-progress fiscalization can be completed.",
+    );
+  }
 
-    if (receipt.receiptNumber.trim().length === 0) {
-        throw new InvalidFiscalizationOperationError(
-            "Receipt number must not be empty.",
-        );
-    }
+  if (receipt.receiptNumber.trim().length === 0) {
+    throw new InvalidFiscalizationOperationError("Receipt number must not be empty.");
+  }
 
-    if (Number.isNaN(receipt.issuedAt.getTime())) {
-        throw new InvalidFiscalizationOperationError(
-            "Receipt issue date must be valid.",
-        );
-    }
+  if (Number.isNaN(receipt.issuedAt.getTime())) {
+    throw new InvalidFiscalizationOperationError("Receipt issue date must be valid.");
+  }
 
-    const updated = transitionTo(record, "Succeeded");
+  const updated = transitionTo(record, "Succeeded");
 
-    return {
-        ...updated,
-        receipt: {
-            receiptNumber: receipt.receiptNumber.trim(),
-            issuedAt: new Date(receipt.issuedAt.getTime()),
-        },
-        failure: null,
-    };
+  return {
+    ...updated,
+    receipt: {
+      receiptNumber: receipt.receiptNumber.trim(),
+      issuedAt: new Date(receipt.issuedAt.getTime()),
+    },
+    failure: null,
+    outcomeUnknownReason: null,
+  };
 }
 
 /**
@@ -96,37 +88,34 @@ export function completeFiscalization(
  * may have issued a receipt, use markOutcomeUnknown instead.
  */
 export function failFiscalization(
-    record: FiscalizationRecord,
-    failure: FiscalizationFailure,
+  record: FiscalizationRecord,
+  failure: FiscalizationFailure,
 ): FiscalizationRecord {
-    if (record.status !== "InProgress") {
-        throw new InvalidFiscalizationOperationError(
-            "Only an in-progress fiscalization can be marked as failed.",
-        );
-    }
+  if (record.status !== "InProgress") {
+    throw new InvalidFiscalizationOperationError(
+      "Only an in-progress fiscalization can be marked as failed.",
+    );
+  }
 
-    if (failure.code.trim().length === 0) {
-        throw new InvalidFiscalizationOperationError(
-            "Failure code must not be empty.",
-        );
-    }
+  if (failure.code.trim().length === 0) {
+    throw new InvalidFiscalizationOperationError("Failure code must not be empty.");
+  }
 
-    if (failure.message.trim().length === 0) {
-        throw new InvalidFiscalizationOperationError(
-            "Failure message must not be empty.",
-        );
-    }
+  if (failure.message.trim().length === 0) {
+    throw new InvalidFiscalizationOperationError("Failure message must not be empty.");
+  }
 
-    const updated = transitionTo(record, "Failed");
+  const updated = transitionTo(record, "Failed");
 
-    return {
-        ...updated,
-        receipt: null,
-        failure: {
-            code: failure.code.trim(),
-            message: failure.message.trim(),
-        },
-    };
+  return {
+    ...updated,
+    receipt: null,
+    failure: {
+      code: failure.code.trim(),
+      message: failure.message.trim(),
+    },
+    outcomeUnknownReason: null,
+  };
 }
 
 /**
@@ -136,23 +125,23 @@ export function failFiscalization(
  * must establish the device outcome before another fiscal command can run.
  */
 export function markOutcomeUnknown(
-    record: FiscalizationRecord,
-    reason: string,
+  record: FiscalizationRecord,
+  reason: string,
 ): FiscalizationRecord {
-    const normalizedReason = reason.trim();
+  const normalizedReason = reason.trim();
 
-    if (normalizedReason.length === 0) {
-        throw new InvalidFiscalizationOperationError(
-            "An explanation is required for an unknown outcome.",
-        );
-    }
+  if (normalizedReason.length === 0) {
+    throw new InvalidFiscalizationOperationError(
+      "An explanation is required for an unknown outcome.",
+    );
+  }
 
-    const updated = transitionTo(record, "OutcomeUnknown");
+  const updated = transitionTo(record, "OutcomeUnknown");
 
-    return {
-        ...updated,
-        receipt: null,
-        failure: null,
-        outcomeUnknownReason: normalizedReason,
-    };
+  return {
+    ...updated,
+    receipt: null,
+    failure: null,
+    outcomeUnknownReason: normalizedReason,
+  };
 }
