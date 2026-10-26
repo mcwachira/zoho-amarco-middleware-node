@@ -56,4 +56,54 @@ describe("Health endpoints", () => {
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-powered-by"]).toBeUndefined();
   });
+
+
+  it("reports connected when device diagnostics succeed", async () => {
+    const fiscalDeviceDiagnostics = {
+      checkConnection: vi.fn().mockResolvedValue({ status: "connected" }),
+    };
+    const app = createApp({ fiscalDeviceDiagnostics });
+
+    const response = await request(app).get("/health/device");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      status: "connected",
+      component: "device",
+    });
+    expect(fiscalDeviceDiagnostics.checkConnection).toHaveBeenCalledOnce();
+  });
+
+  it("reports unavailable when device diagnostics fail", async () => {
+    const fiscalDeviceDiagnostics = {
+      checkConnection: vi.fn().mockResolvedValue({
+        status: "unavailable",
+        reason: "TremolHttpError",
+      }),
+    };
+    const app = createApp({ fiscalDeviceDiagnostics });
+
+    const response = await request(app).get("/health/device");
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      status: "unavailable",
+      component: "device",
+      reason: "TremolHttpError",
+    });
+    expect(fiscalDeviceDiagnostics.checkConnection).toHaveBeenCalledOnce();
+  });
+
+  it("reports unavailable when device diagnostics are not configured", async () => {
+    const app = createApp();
+
+    const response = await request(app).get("/health/device");
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      status: "unavailable",
+      component: "device",
+    });
+  });
+
 });

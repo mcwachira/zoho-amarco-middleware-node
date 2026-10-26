@@ -10,9 +10,21 @@ import { RegisterFiscalizationRequestService } from "./application/fiscalization
 import { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
 import { RecoverStaleFiscalizationsService } from "./application/fiscalization/recover-stale-fiscalizations.js";
 import { startStaleFiscalizationRecoveryWorker } from "./application/fiscalization/stale-fiscalization-recovery-worker.js";
+import { TremolZfpLabServerClient } from "./infrastructure/device/tremol-zfplabserver-client.js";
+import { TremolDeviceDiagnostics } from "./infrastructure/device/tremol-device-diagnostics.js";
+
 
 const databaseProvider = createFiscalizationRepositoryProvider();
 
+// Configure the Tremol ZFPLabServer client.
+// Construction validates its settings but does not send device commands.
+const tremolClient = new TremolZfpLabServerClient({
+  baseUrl: env.TREMOL_BASE_URL,
+  timeoutMs: env.TREMOL_TIMEOUT_MS,
+});
+
+// Expose read-only device connectivity diagnostics to the API.
+const fiscalDeviceDiagnostics = new TremolDeviceDiagnostics(tremolClient);
 // Enable OAuth only when all required credentials are configured.
 // Otherwise, the OAuth routes will respond with HTTP 503.
 const oauthService =
@@ -53,6 +65,7 @@ const app = createApp({
   ...(booksClient ? { booksClient } : {}),
   ...(invoiceService ? { invoiceService } : {}),
   ...(prepareFiscalizationRequestService ? { prepareFiscalizationRequestService } : {}),
+    fiscalDeviceDiagnostics,
 });
 
 const server = app.listen(env.PORT, () => {

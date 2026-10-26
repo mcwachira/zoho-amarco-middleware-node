@@ -17,6 +17,10 @@ export const envSchema = z
     // Protect invoice endpoints from unauthorized access.
     // Generate a strong random token and keep it out of source control.
     INVOICE_API_BEARER_TOKEN: z.string().trim().min(32).optional(),
+    // Tremol ZFPLabServer connection.
+    // This only configures the endpoint; it does not enable receipt issuance.
+    TREMOL_BASE_URL: z.string().url().default("http://localhost:4444"),
+    TREMOL_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
@@ -65,6 +69,15 @@ export const envSchema = z
         code: "custom",
         path: ["DATABASE_URL"],
         message: "DATABASE_URL is required when DATABASE_PROVIDER is postgresql",
+      });
+    }
+
+    // Production must use an explicitly configured device endpoint.
+    if (value.NODE_ENV === "production" && !process.env["TREMOL_BASE_URL"]?.trim()) {
+      context.addIssue({
+        code: "custom",
+        path: ["TREMOL_BASE_URL"],
+        message: "TREMOL_BASE_URL must be explicitly configured in production",
       });
     }
 
