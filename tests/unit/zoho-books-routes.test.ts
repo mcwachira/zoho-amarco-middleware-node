@@ -267,7 +267,8 @@ describe("Zoho Books routes", () => {
       id: "request-123",
       zohoInvoiceId: "invoice-123",
     });
-    expect(response.body.request.status).toBeTruthy();
+    expect(response.body.request.status).toBe("Pending");
+    expect(booksClient.getInvoice).toHaveBeenCalledOnce();
     expect(repository.create).toHaveBeenCalledOnce();
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
