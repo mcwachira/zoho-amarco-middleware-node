@@ -214,4 +214,63 @@ describe("PostgresqlFiscalizationRepository", () => {
 
     await expect(repository.create(record)).rejects.toBe(databaseError);
   });
+
+  it("marks stale InProgress records as OutcomeUnknown", async () => {
+    const staleBefore = new Date("2026-10-23T08:00:00.000Z");
+    const reason = "The request was abandoned before its device outcome was saved.";
+
+    prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await repository.markStaleInProgressOutcomeUnknown(staleBefore, reason);
+
+    expect(prismaMock.fiscalizationRecord.updateMany).toHaveBeenCalledWith({
+      where: {
+        status: "InProgress",
+        updatedAt: {
+          lt: staleBefore,
+        },
+      },
+      data: {
+        status: "OutcomeUnknown",
+        receiptNumber: null,
+        issuedAt: null,
+        failureCode: null,
+        failureMessage: null,
+        outcomeUnknownReason: reason,
+        updatedAt: expect.any(Date),
+      },
+    });
+
+    expect(result).toBe(2);
+  });
+
+  it("returns zero when no stale InProgress records are found", async () => {
+    prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await repository.markStaleInProgressOutcomeUnknown(
+      new Date("2026-10-23T08:00:00.000Z"),
+      "Recovery after an interrupted request.",
+    );
+
+    expect(result).toBe(0);
+  });
+
+  it("rejects a blank recovery reason without updating the database", async () => {
+    await expect(
+      repository.markStaleInProgressOutcomeUnknown(new Date("2026-10-23T08:00:00.000Z"), "   "),
+    ).rejects.toThrow("Recovery reason must not be empty.");
+
+    expect(prismaMock.fiscalizationRecord.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects a recovery reason longer than 2000 characters", async () => {
+    await expect(
+      repository.markStaleInProgressOutcomeUnknown(
+        new Date("2026-10-23T08:00:00.000Z"),
+        "x".repeat(2001),
+      ),
+    ).rejects.toThrow("Recovery reason must not exceed 2000 characters.");
+
+    expect(prismaMock.fiscalizationRecord.updateMany).not.toHaveBeenCalled();
+  });
 });

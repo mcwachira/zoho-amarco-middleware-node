@@ -106,4 +106,37 @@ export class SqlServerFiscalizationRepository implements FiscalizationRepository
 
     return result.count === 1;
   }
+
+  async markStaleInProgressOutcomeUnknown(staleBefore: Date, reason: string): Promise<number> {
+    // Validate the reason before modifying any database records.
+    if (reason.trim().length === 0) {
+      throw new Error("Recovery reason must not be empty.");
+    }
+
+    if (reason.length > 2000) {
+      throw new Error("Recovery reason must not exceed 2000 characters.");
+    }
+
+    // Atomically recover only records that are still InProgress
+    // and whose last update occurred before the cutoff.
+    const result = await this.prisma.fiscalizationRecord.updateMany({
+      where: {
+        status: "InProgress",
+        updatedAt: {
+          lt: staleBefore,
+        },
+      },
+      data: {
+        status: "OutcomeUnknown",
+        receiptNumber: null,
+        issuedAt: null,
+        failureCode: null,
+        failureMessage: null,
+        outcomeUnknownReason: reason,
+        updatedAt: new Date(),
+      },
+    });
+
+    return result.count;
+  }
 }

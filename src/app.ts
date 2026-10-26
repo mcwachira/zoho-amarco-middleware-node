@@ -11,7 +11,7 @@ import { env } from "./config/env.js";
 import { requireInvoiceApiToken } from "./middleware/require-invoice-api-token.js";
 import type { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
 import type { FiscalizationRepository } from "./application/fiscalization/fiscalization-repository.js";
-
+import type { FiscalizationService } from "./application/fiscalization/fiscalization-service.js";
 
 export interface AppDependencies {
   checkDatabaseConnection?: () => Promise<void>;
@@ -21,6 +21,7 @@ export interface AppDependencies {
   invoiceApiBearerToken?: string;
   prepareFiscalizationRequestService?: PrepareFiscalizationRequestService;
   fiscalizationRepository?: FiscalizationRepository;
+  readonly fiscalizationService?: FiscalizationService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -53,16 +54,15 @@ export function createApp(dependencies: AppDependencies = {}): Express {
 
   app.use("/integrations/zoho", createZohoOAuthRouter(dependencies.oauthService));
   app.use(
-      "/integrations/zoho",
-      requireInvoiceApiToken(
-          dependencies.invoiceApiBearerToken ?? env.INVOICE_API_BEARER_TOKEN,
-      ),
-      createZohoBooksRouter(
-          dependencies.booksClient,
-          dependencies.invoiceService,
-          dependencies.prepareFiscalizationRequestService,
-          dependencies.fiscalizationRepository,
-      ),
+    "/integrations/zoho",
+    requireInvoiceApiToken(dependencies.invoiceApiBearerToken ?? env.INVOICE_API_BEARER_TOKEN),
+    createZohoBooksRouter(
+      dependencies.booksClient,
+      dependencies.invoiceService,
+      dependencies.prepareFiscalizationRequestService,
+      dependencies.fiscalizationRepository,
+      dependencies.fiscalizationService,
+    ),
   );
 
   app.use((_req, res) => {

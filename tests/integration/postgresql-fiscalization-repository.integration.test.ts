@@ -124,4 +124,113 @@ integrationDescribe("PostgreSQL fiscalization repository (integrations)", () => 
       issuedAt,
     });
   });
+
+  it("recovers stale requests without changing fresh or succeeded records", async () => {
+    const staleRecord = newRecord();
+    const freshRecord = newRecord();
+    const succeededRecord = newRecord();
+
+    await repository.create(staleRecord);
+    await repository.create(freshRecord);
+    await repository.create(succeededRecord);
+
+    const staleClaim = await repository.claimPending(staleRecord.id);
+    const freshClaim = await repository.claimPending(freshRecord.id);
+    const succeededClaim = await repository.claimPending(succeededRecord.id);
+
+    expect(staleClaim).not.toBeNull();
+    expect(freshClaim).not.toBeNull();
+    expect(succeededClaim).not.toBeNull();
+
+    if (!staleClaim || !freshClaim || !succeededClaim) {
+      throw new Error("Expected all three records to be claimed.");
+    }
+
+    const issuedAt = new Date("2026-10-24T08:30:00.000Z");
+
+    const succeeded = completeFiscalization(succeededClaim, {
+      receiptNumber: "RECOVERY-TEST-RECEIPT",
+      issuedAt,
+    });
+
+    expect(await repository.saveOutcome(succeeded)).toBe(true);
+
+    // Make only the first InProgress record stale.
+    const staleBefore = new Date(Date.now() - 30_000);
+    const staleUpdatedAt = new Date(staleBefore.getTime() - 1_000);
+
+    await prisma.fiscalizationRecord.update({
+      where: { id: staleRecord.id },
+      data: { updatedAt: staleUpdatedAt },
+    });
+
+    const reason = "Integration test: stale processing recovery.";
+
+    const recoveredCount = await repository.markStaleInProgressOutcomeUnknown(staleBefore, reason);
+
+    expect(recoveredCount).toBe(1);
+
+    const storedStale = await repository.findById(staleRecord.id);
+    const storedFresh = await repository.findById(freshRecord.id);
+    const storedSucceeded = await repository.findById(succeededRecord.id);
+
+    expect(storedStale?.status).toBe("OutcomeUnknown");
+    expect(storedStale?.outcomeUnknownReason).toBe(reason);
+    expect(storedStale?.receipt).toBeNull();
+
+    expect(storedFresh?.status).toBe("InProgress");
+
+    expect(storedSucceeded?.status).toBe("Succeeded");
+    expect(storedSucceeded?.receipt).toEqual({
+      receiptNumber: "RECOVERY-TEST-RECEIPT",
+      issuedAt,
+    });
+
+    // Recovery is idempotent: the same record is not recovered twice.
+    expect(await repository.markStaleInProgressOutcomeUnknown(staleBefore, reason)).toBe(0);
+  });
+
+  it("does not let a late outcome overwrite a recovered request", async () => {
+    const record = newRecord();
+    await repository.create(record);
+
+    const claimed = await repository.claimPending(record.id);
+    expect(claimed).not.toBeNull();
+
+    if (!claimed) {
+      throw new Error("Expected the Pending record to be claimed.");
+    }
+
+    const staleBefore = new Date(Date.now() - 30_000);
+
+    await prisma.fiscalizationRecord.update({
+      where: { id: record.id },
+      data: {
+        updatedAt: new Date(staleBefore.getTime() - 1_000),
+      },
+    });
+
+    expect(
+      await repository.markStaleInProgressOutcomeUnknown(
+        staleBefore,
+        "Integration test: device outcome requires reconciliation.",
+      ),
+    ).toBe(1);
+
+    // Simulate the original worker receiving a late success response.
+    const lateSuccess = completeFiscalization(claimed, {
+      receiptNumber: "LATE-TEST-RECEIPT",
+      issuedAt: new Date("2026-10-24T08:30:00.000Z"),
+    });
+
+    expect(await repository.saveOutcome(lateSuccess)).toBe(false);
+
+    const stored = await repository.findById(record.id);
+
+    expect(stored?.status).toBe("OutcomeUnknown");
+    expect(stored?.receipt).toBeNull();
+    expect(stored?.outcomeUnknownReason).toBe(
+      "Integration test: device outcome requires reconciliation.",
+    );
+  });
 });
