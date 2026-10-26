@@ -7,13 +7,17 @@ import type {
 import type { FiscalizationRepository } from "../../src/application/fiscalization/fiscalization-repository.js";
 import {
   FiscalizationClaimError,
+  FiscalizationInvoiceMismatchError,
   FiscalizationPersistenceError,
+  FiscalizationRequestNotFoundError,
   FiscalizationService,
 } from "../../src/application/fiscalization/fiscalization-service.js";
-import { DuplicateZohoInvoiceError } from "../../src/application/fiscalization/fiscalization-errors.js";
 import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
 import { startFiscalization } from "../../src/domain/fiscalization/fiscalization-operations.js";
-import type { FiscalizationRecord } from "../../src/domain/fiscalization/fiscalization-record.js";
+import {
+  createFiscalizationRecord,
+  type FiscalizationRecord,
+} from "../../src/domain/fiscalization/fiscalization-record.js";
 
 const invoice: FiscalInvoiceCandidate = {
   zohoInvoiceId: "zoho-invoice-001",
@@ -54,14 +58,15 @@ const successfulResult: FiscalDeviceResult = {
 };
 
 /**
- * Creates an in-memory repository for tests.
+ * Creates an in-memory repository with an already-registered record.
  * No real database connection is needed.
  */
-function createRepository(events: string[] = []) {
-  let currentRecord: FiscalizationRecord | null = null;
+function createRepository(initialRecord: FiscalizationRecord, events: string[] = []) {
+  let currentRecord: FiscalizationRecord | null = initialRecord;
 
   const repository = {
     findById: vi.fn(async (id: string): Promise<FiscalizationRecord | null> => {
+      events.push("find");
       return currentRecord?.id === id ? currentRecord : null;
     }),
 
@@ -73,15 +78,11 @@ function createRepository(events: string[] = []) {
     claimPending: vi.fn(async (id: string): Promise<FiscalizationRecord | null> => {
       events.push("claim");
 
-      if (
-          currentRecord === null ||
-          currentRecord.id !== id ||
-          currentRecord.status !== "Pending"
-      ) {
+      if (currentRecord === null || currentRecord.id !== id || currentRecord.status !== "Pending") {
         return null;
       }
 
-      // Simulate the database claiming Pending -> InProgress.
+      // Simulate the database atomically claiming Pending -> InProgress.
       const claimed = startFiscalization(currentRecord);
       currentRecord = claimed;
 
@@ -91,11 +92,11 @@ function createRepository(events: string[] = []) {
     saveOutcome: vi.fn(async (record: FiscalizationRecord): Promise<boolean> => {
       events.push("save");
 
-      // Only save the result if this record is still InProgress.
+      // Only save the result if the record is still InProgress.
       if (
-          currentRecord === null ||
-          currentRecord.id !== record.id ||
-          currentRecord.status !== "InProgress"
+        currentRecord === null ||
+        currentRecord.id !== record.id ||
+        currentRecord.status !== "InProgress"
       ) {
         return false;
       }
@@ -103,6 +104,8 @@ function createRepository(events: string[] = []) {
       currentRecord = record;
       return true;
     }),
+
+    markStaleInProgressOutcomeUnknown: vi.fn(async (): Promise<number> => 0),
   } satisfies FiscalizationRepository;
 
   return {
@@ -114,17 +117,12 @@ function createRepository(events: string[] = []) {
 /**
  * Creates a mocked device that never contacts a physical printer.
  */
-function createDevice(
-    events: string[] = [],
-    result: FiscalDeviceResult = successfulResult,
-) {
+function createDevice(events: string[] = [], result: FiscalDeviceResult = successfulResult) {
   const device = {
-    issueReceipt: vi.fn(
-        async (_invoice: FiscalInvoiceCandidate): Promise<FiscalDeviceResult> => {
-          events.push("device");
-          return result;
-        },
-    ),
+    issueReceipt: vi.fn(async (): Promise<FiscalDeviceResult> => {
+      events.push("device");
+      return result;
+    }),
   } satisfies FiscalDevice;
 
   return device;
@@ -132,7 +130,14 @@ function createDevice(
 
 function createHarness(result?: FiscalDeviceResult) {
   const events: string[] = [];
-  const { repository, getCurrentRecord } = createRepository(events);
+
+  // Processing must begin with a record registered before this service runs.
+  const pendingRecord = createFiscalizationRecord({
+    id: input.id,
+    zohoInvoiceId: input.invoice.zohoInvoiceId,
+  });
+
+  const { repository, getCurrentRecord } = createRepository(pendingRecord, events);
   const device = createDevice(events, result);
   const service = new FiscalizationService(repository, device);
 
@@ -146,17 +151,53 @@ function createHarness(result?: FiscalDeviceResult) {
 }
 
 describe("FiscalizationService", () => {
-  it("creates and claims the record before calling the device", async () => {
+  it("loads and claims an existing record before calling the device", async () => {
     const { service, events, repository, device } = createHarness();
 
     const result = await service.fiscalize(input);
 
-    expect(events).toEqual(["create", "claim", "device", "save"]);
-    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(["find", "claim", "device", "save"]);
+    expect(repository.findById).toHaveBeenCalledWith(input.id);
+    expect(repository.create).not.toHaveBeenCalled();
     expect(repository.claimPending).toHaveBeenCalledWith(input.id);
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
     expect(device.issueReceipt).toHaveBeenCalledWith(invoice);
     expect(result.status).toBe("Succeeded");
+  });
+
+  it("rejects a missing request without claiming or calling the device", async () => {
+    const { service, repository, device } = createHarness();
+
+    repository.findById.mockResolvedValue(null);
+
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
+      FiscalizationRequestNotFoundError,
+    );
+
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invoice that does not match the registered request", async () => {
+    const { service, repository, device } = createHarness();
+
+    const mismatchedInput = {
+      id: input.id,
+      invoice: {
+        ...invoice,
+        zohoInvoiceId: "different-zoho-invoice",
+      },
+    };
+
+    await expect(service.fiscalize(mismatchedInput)).rejects.toBeInstanceOf(
+      FiscalizationInvoiceMismatchError,
+    );
+
+    expect(repository.findById).toHaveBeenCalledWith(input.id);
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
   });
 
   it("does not call the device when the record cannot be claimed", async () => {
@@ -164,9 +205,7 @@ describe("FiscalizationService", () => {
 
     repository.claimPending.mockResolvedValue(null);
 
-    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
-        FiscalizationClaimError,
-    );
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationClaimError);
 
     expect(device.issueReceipt).not.toHaveBeenCalled();
     expect(repository.saveOutcome).not.toHaveBeenCalled();
@@ -179,14 +218,14 @@ describe("FiscalizationService", () => {
 
     expect(result.status).toBe("Succeeded");
     expect(result.receipt).toEqual(
-        successfulResult.kind === "succeeded" ? successfulResult.receipt : null,
+      successfulResult.kind === "succeeded" ? successfulResult.receipt : null,
     );
     expect(result.failure).toBeNull();
     expect(result.outcomeUnknownReason).toBeNull();
     expect(getCurrentRecord()?.status).toBe("Succeeded");
   });
 
-  it("records an unknown outcome when the device reports success with an invalid receipt", async () => {
+  it("records an unknown outcome when success contains an invalid receipt", async () => {
     const invalidResult: FiscalDeviceResult = {
       kind: "succeeded",
       receipt: {
@@ -195,8 +234,7 @@ describe("FiscalizationService", () => {
       },
     };
 
-    const { service, device, repository, getCurrentRecord } =
-        createHarness(invalidResult);
+    const { service, device, repository, getCurrentRecord } = createHarness(invalidResult);
 
     const result = await service.fiscalize(input);
 
@@ -223,9 +261,7 @@ describe("FiscalizationService", () => {
     expect(result.status).toBe("Failed");
     expect(result.receipt).toBeNull();
     expect(result.outcomeUnknownReason).toBeNull();
-    expect(result.failure).toEqual(
-        failureResult.kind === "failed" ? failureResult.failure : null,
-    );
+    expect(result.failure).toEqual(failureResult.kind === "failed" ? failureResult.failure : null);
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
   });
 
@@ -240,9 +276,7 @@ describe("FiscalizationService", () => {
     const result = await service.fiscalize(input);
 
     expect(result.status).toBe("OutcomeUnknown");
-    expect(result.outcomeUnknownReason).toBe(
-        "The device response was incomplete.",
-    );
+    expect(result.outcomeUnknownReason).toBe("The device response was incomplete.");
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
   });
 
@@ -255,29 +289,21 @@ describe("FiscalizationService", () => {
 
     expect(result.status).toBe("OutcomeUnknown");
     expect(repository.saveOutcome).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: "OutcomeUnknown",
-          outcomeUnknownReason: expect.stringContaining(
-              "could not be reliably confirmed",
-          ),
-        }),
+      expect.objectContaining({
+        status: "OutcomeUnknown",
+        outcomeUnknownReason: expect.stringContaining("could not be reliably confirmed"),
+      }),
     );
-    expect(result.outcomeUnknownReason).toContain(
-        "could not be reliably confirmed",
-    );
+    expect(result.outcomeUnknownReason).toContain("could not be reliably confirmed");
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
   });
 
   it("does not repeat the device call when saving the outcome throws", async () => {
     const { service, repository, device } = createHarness();
 
-    repository.saveOutcome.mockRejectedValue(
-        new Error("Database connection lost"),
-    );
+    repository.saveOutcome.mockRejectedValue(new Error("Database connection lost"));
 
-    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
-        FiscalizationPersistenceError,
-    );
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationPersistenceError);
 
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
     expect(repository.saveOutcome).toHaveBeenCalledTimes(1);
@@ -288,28 +314,9 @@ describe("FiscalizationService", () => {
 
     repository.saveOutcome.mockResolvedValue(false);
 
-    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
-        FiscalizationPersistenceError,
-    );
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationPersistenceError);
 
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
     expect(repository.saveOutcome).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not call the device when the Zoho invoice is a duplicate", async () => {
-    const { service, repository, device } = createHarness();
-
-    repository.create.mockRejectedValue(
-        new DuplicateZohoInvoiceError(input.invoice.zohoInvoiceId),
-    );
-
-    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
-        DuplicateZohoInvoiceError,
-    );
-
-    expect(repository.create).toHaveBeenCalledTimes(1);
-    expect(repository.claimPending).not.toHaveBeenCalled();
-    expect(device.issueReceipt).not.toHaveBeenCalled();
-    expect(repository.saveOutcome).not.toHaveBeenCalled();
   });
 });
