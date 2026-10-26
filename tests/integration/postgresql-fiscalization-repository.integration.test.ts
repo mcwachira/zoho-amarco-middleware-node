@@ -12,7 +12,7 @@ import { PostgresqlFiscalizationRepository } from "../../src/infrastructure/data
 const integrationEnabled = process.env["RUN_POSTGRES_INTEGRATION"] === "1";
 const integrationDescribe = integrationEnabled ? describe : describe.skip;
 
-integrationDescribe("PostgreSQL fiscalization repository (integration)", () => {
+integrationDescribe("PostgreSQL fiscalization repository (integrations)", () => {
   const testInvoiceIds: string[] = [];
 
   let prisma: ReturnType<typeof createPostgresqlClient>;
@@ -31,7 +31,7 @@ integrationDescribe("PostgreSQL fiscalization repository (integration)", () => {
     const connectionString = process.env["DATABASE_URL"];
 
     if (!connectionString) {
-      throw new Error("DATABASE_URL is required to run PostgreSQL integration tests.");
+      throw new Error("DATABASE_URL is required to run PostgreSQL integrations tests.");
     }
 
     const parsedUrl = new URL(connectionString);
