@@ -1,5 +1,6 @@
 import type { FiscalizationRepository } from "./fiscalization-repository.js";
 import type { FiscalDevice, FiscalDeviceResult } from "./fiscal-device.js";
+import type { FiscalInvoiceCandidate } from "../zoho/zoho-invoice-mapper.js";
 
 import { InvalidFiscalizationOperationError } from "../../domain/fiscalization/fiscalization-errors.js";
 import {
@@ -13,12 +14,13 @@ import {
 } from "../../domain/fiscalization/fiscalization-operations.js";
 
 /**
- * The information currently required to begin a fiscalization attempt.
+ * Information required to start fiscalization for a mapped invoice.
  */
 export interface StartFiscalizationInput {
   readonly id: string;
-  readonly zohoInvoiceId: string;
+  readonly invoice: FiscalInvoiceCandidate;
 }
+
 
 /**
  * Thrown when a record cannot be claimed for processing.
@@ -54,7 +56,10 @@ export class FiscalizationService {
    */
   async fiscalize(input: StartFiscalizationInput): Promise<FiscalizationRecord> {
     // Step 1: Create the initial Pending record.
-    const pending = createFiscalizationRecord(input);
+    const pending = createFiscalizationRecord({
+      id: input.id,
+      zohoInvoiceId: input.invoice.zohoInvoiceId,
+    });
     await this.repository.create(pending);
 
     // Step 2: Atomically claim Pending -> InProgress.
@@ -68,7 +73,7 @@ export class FiscalizationService {
     let result: FiscalDeviceResult | undefined;
 
     try {
-      result = await this.device.issueReceipt();
+      result = await this.device.issueReceipt(input.invoice);
     } catch {
       // An exception or timeout does not prove that no receipt was issued.
       result = undefined;

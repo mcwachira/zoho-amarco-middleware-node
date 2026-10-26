@@ -1,14 +1,22 @@
 import type { FiscalizationRepository } from "../../application/fiscalization/fiscalization-repository.js";
+import type { ZohoOAuthAttemptRepository } from "../../application/zoho/oauth-attempt-repository.js";
 import { env } from "../../config/env.js";
 import { PostgresqlFiscalizationRepository } from "./postgresql-fiscalization-repository.js";
 import { SqlServerFiscalizationRepository } from "./sqlserver-fiscalization-repository.js";
+import { PostgresqlZohoOAuthAttemptRepository } from "./postgresql-zoho-oauth-attempt-repository.js";
+import { SqlServerZohoOAuthAttemptRepository } from "./sqlserver-zoho-oauth-attempt-repository.js";
 import { createPostgresqlClient } from "./postgresql-client.js";
 import { createSqlServerClient } from "./sqlserver-client.js";
+import type { ZohoTokenRepository } from "../../application/zoho/zoho-token-repository.js";
+import { PostgresqlZohoTokenRepository } from "./postgresql-zoho-token-repository.js";
+import { SqlServerZohoTokenRepository } from "./sqlserver-zoho-token-repository.js";
 
 type SqlServerConfig = Parameters<typeof createSqlServerClient>[0];
 
 export interface FiscalizationRepositoryProvider {
   readonly repository: FiscalizationRepository;
+  readonly oauthAttemptRepository: ZohoOAuthAttemptRepository;
+  readonly zohoTokenRepository: ZohoTokenRepository;
   checkConnection(): Promise<void>;
   disconnect(): Promise<void>;
 }
@@ -22,11 +30,17 @@ export function createFiscalizationRepositoryProvider(): FiscalizationRepository
         throw new Error("DATABASE_URL is required for PostgreSQL");
       }
 
+      // Both repositories share this Prisma client and its connection pool.
       const client = createPostgresqlClient(connectionString);
+
       const repository = new PostgresqlFiscalizationRepository(client);
+      const oauthAttemptRepository = new PostgresqlZohoOAuthAttemptRepository(client);
+      const zohoTokenRepository = new PostgresqlZohoTokenRepository(client);
 
       return {
         repository,
+        oauthAttemptRepository,
+        zohoTokenRepository,
         checkConnection: async () => {
           await client.$queryRaw`SELECT 1`;
         },
@@ -56,11 +70,17 @@ export function createFiscalizationRepositoryProvider(): FiscalizationRepository
         },
       };
 
+      // Both repositories share this Prisma client and its connection pool.
       const client = createSqlServerClient(config);
+
       const repository = new SqlServerFiscalizationRepository(client);
+      const oauthAttemptRepository = new SqlServerZohoOAuthAttemptRepository(client);
+      const zohoTokenRepository = new SqlServerZohoTokenRepository(client);
 
       return {
         repository,
+        oauthAttemptRepository,
+        zohoTokenRepository,
         checkConnection: async () => {
           await client.$queryRaw`SELECT 1`;
         },
