@@ -14,7 +14,9 @@ export const envSchema = z
     SQLSERVER_PORT: z.coerce.number().int().min(1).max(65535).default(1433),
     SQLSERVER_ENCRYPT: z.enum(["true", "false"]).default("true"),
     SQLSERVER_TRUST_SERVER_CERTIFICATE: z.enum(["true", "false"]).default("false"),
-
+      // Protect invoice endpoints from unauthorized access.
+      // Generate a strong random token and keep it out of source control.
+      INVOICE_API_BEARER_TOKEN: z.string().trim().min(32).optional(),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
@@ -24,12 +26,18 @@ export const envSchema = z
     // If provided, each credential must contain a non-whitespace value.
     ZOHO_CLIENT_ID: z.string().trim().min(1).optional(),
     ZOHO_CLIENT_SECRET: z.string().trim().min(1).optional(),
+    ZOHO_ORGANIZATION_ID: z.string().trim().min(1).optional(),
 
     // Must exactly match the redirect URI registered in Zoho API Console.
     ZOHO_REDIRECT_URI: z.string().url().default("http://localhost:3000/integrations/zoho/callback"),
 
     // Default to the US data center; configure the correct region for your account.
-    ZOHO_ACCOUNTS_URL: z.string().url().default("https://accounts.zoho.com"),
+    ZOHO_ACCOUNTS_URL: z.string().url().default("https://accounts.zoho.com"), // A 32-byte (64-character hexadecimal) key used to encrypt PKCE verifiers.
+    // Keep it out of source control and never log it.
+    ZOHO_OAUTH_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, "Must be a 64-character hexadecimal key")
+      .optional(),
   })
   .superRefine((value, context) => {
     if (value.DATABASE_PROVIDER === "postgresql" && !value.DATABASE_URL?.trim()) {
@@ -39,6 +47,14 @@ export const envSchema = z
         message: "DATABASE_URL is required when DATABASE_PROVIDER is postgresql",
       });
     }
+
+      if (value.NODE_ENV === "production" && !value.INVOICE_API_BEARER_TOKEN) {
+          context.addIssue({
+              code: "custom",
+              path: ["INVOICE_API_BEARER_TOKEN"],
+              message: "INVOICE_API_BEARER_TOKEN is required in production",
+          });
+      }
 
     if (value.DATABASE_PROVIDER === "sqlserver") {
       for (const key of [

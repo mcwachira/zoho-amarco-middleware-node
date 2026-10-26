@@ -2,9 +2,25 @@ import express, { type ErrorRequestHandler, type Express } from "express";
 import helmet from "helmet";
 import * as pinoHttp from "pino-http";
 import { logger } from "./observability/logger.js";
+import type { ZohoOAuthService } from "./application/zoho/zoho-oauth-service.js";
+import { createZohoOAuthRouter } from "./routes/zoho-oauth-routes.js";
+import type { ZohoBooksClient } from "./integrations/zoho/books-client.js";
+import { createZohoBooksRouter } from "./routes/zoho-books-routes.js";
+import type { ZohoInvoiceService } from "./application/zoho/zoho-invoice-service.js";
+import { env } from "./config/env.js";
+import { requireInvoiceApiToken } from "./middleware/require-invoice-api-token.js";
+import type { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
+import type { FiscalizationRepository } from "./application/fiscalization/fiscalization-repository.js";
+
 
 export interface AppDependencies {
   checkDatabaseConnection?: () => Promise<void>;
+  oauthService?: ZohoOAuthService;
+  booksClient?: ZohoBooksClient;
+  invoiceService?: ZohoInvoiceService;
+  invoiceApiBearerToken?: string;
+  prepareFiscalizationRequestService?: PrepareFiscalizationRequestService;
+  fiscalizationRepository?: FiscalizationRepository;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -34,6 +50,20 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       res.status(503).json({ status: "not_ready" });
     }
   });
+
+  app.use("/integrations/zoho", createZohoOAuthRouter(dependencies.oauthService));
+  app.use(
+      "/integrations/zoho",
+      requireInvoiceApiToken(
+          dependencies.invoiceApiBearerToken ?? env.INVOICE_API_BEARER_TOKEN,
+      ),
+      createZohoBooksRouter(
+          dependencies.booksClient,
+          dependencies.invoiceService,
+          dependencies.prepareFiscalizationRequestService,
+          dependencies.fiscalizationRepository,
+      ),
+  );
 
   app.use((_req, res) => {
     res.status(404).json({
