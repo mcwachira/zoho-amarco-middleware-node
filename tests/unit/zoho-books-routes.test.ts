@@ -56,9 +56,7 @@ function createValidInvoiceBooksClientMock() {
 
 const TEST_INVOICE_API_TOKEN = "test-invoice-api-token-for-unit-tests";
 
-function createTestApp(
-    dependencies: Parameters<typeof createApp>[0] = {},
-) {
+function createTestApp(dependencies: Parameters<typeof createApp>[0] = {}) {
   return createApp({
     ...dependencies,
     invoiceApiBearerToken: TEST_INVOICE_API_TOKEN,
@@ -66,19 +64,16 @@ function createTestApp(
 }
 
 function authorizedRequest(
-    method: "get",
-    app: ReturnType<typeof createApp>,
-    path: string,
+  method: "get" | "post",
+  app: ReturnType<typeof createApp>,
+  path: string,
 ) {
-  return request(app)[method](path).set(
-      "Authorization",
-      `Bearer ${TEST_INVOICE_API_TOKEN}`,
-  );
+  return request(app)[method](path).set("Authorization", `Bearer ${TEST_INVOICE_API_TOKEN}`);
 }
 
 function createPreparationService(
-    booksClient: ZohoBooksClient,
-    repositoryOverrides: Partial<FiscalizationRepository> = {},
+  booksClient: ZohoBooksClient,
+  repositoryOverrides: Partial<FiscalizationRepository> = {},
 ) {
   const repository = {
     create: vi.fn().mockResolvedValue(undefined),
@@ -86,14 +81,12 @@ function createPreparationService(
   } as unknown as FiscalizationRepository;
 
   const invoiceService = new ZohoInvoiceService(booksClient);
-  const registrationService = new RegisterFiscalizationRequestService(
-      repository,
-  );
+  const registrationService = new RegisterFiscalizationRequestService(repository);
 
   const prepareService = new PrepareFiscalizationRequestService(
-      invoiceService,
-      registrationService,
-      () => "request-123",
+    invoiceService,
+    registrationService,
+    () => "request-123",
   );
 
   return { prepareService, repository };
@@ -103,11 +96,7 @@ describe("Zoho Books routes", () => {
   it("returns 503 when invoice retrieval is not configured", async () => {
     const app = createTestApp();
 
-    const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123",
-    );
+    const response = await authorizedRequest("get", app, "/integrations/zoho/invoices/invoice-123");
 
     expect(response.status).toBe(503);
     expect(response.body.error.code).toBe("ZOHO_BOOKS_UNAVAILABLE");
@@ -117,11 +106,7 @@ describe("Zoho Books routes", () => {
     const booksClient = createBooksClientMock();
     const app = createTestApp({ booksClient });
 
-    const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123",
-    );
+    const response = await authorizedRequest("get", app, "/integrations/zoho/invoices/invoice-123");
 
     expect(response.status).toBe(200);
     expect(response.body.invoice).toMatchObject({
@@ -140,44 +125,32 @@ describe("Zoho Books routes", () => {
     const booksClient = createBooksClientMock();
 
     vi.mocked(booksClient.getInvoice).mockRejectedValue(
-        new ZohoBooksApiError("Sensitive upstream details", 401),
+      new ZohoBooksApiError("Sensitive upstream details", 401),
     );
 
     const app = createTestApp({ booksClient });
 
-    const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123",
-    );
+    const response = await authorizedRequest("get", app, "/integrations/zoho/invoices/invoice-123");
 
     expect(response.status).toBe(502);
     expect(response.body.error.code).toBe("ZOHO_BOOKS_UPSTREAM_ERROR");
-    expect(JSON.stringify(response.body)).not.toContain(
-        "Sensitive upstream details",
-    );
+    expect(JSON.stringify(response.body)).not.toContain("Sensitive upstream details");
   });
 
   it("returns a safe generic 500 for unexpected failures", async () => {
     const booksClient = createBooksClientMock();
 
     vi.mocked(booksClient.getInvoice).mockRejectedValue(
-        new Error("Sensitive token or database details"),
+      new Error("Sensitive token or database details"),
     );
 
     const app = createTestApp({ booksClient });
 
-    const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123",
-    );
+    const response = await authorizedRequest("get", app, "/integrations/zoho/invoices/invoice-123");
 
     expect(response.status).toBe(500);
     expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
-    expect(JSON.stringify(response.body)).not.toContain(
-        "Sensitive token or database details",
-    );
+    expect(JSON.stringify(response.body)).not.toContain("Sensitive token or database details");
   });
 
   it("returns a mapped fiscal candidate without fiscalizing the invoice", async () => {
@@ -186,9 +159,9 @@ describe("Zoho Books routes", () => {
     const app = createTestApp({ booksClient, invoiceService });
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
+      "get",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
     expect(response.status).toBe(200);
@@ -208,15 +181,13 @@ describe("Zoho Books routes", () => {
     const app = createTestApp();
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
+      "get",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
     expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe(
-        "ZOHO_INVOICE_SERVICE_UNAVAILABLE",
-    );
+    expect(response.body.error.code).toBe("ZOHO_INVOICE_SERVICE_UNAVAILABLE");
   });
 
   it("returns mapping errors when the retrieved invoice is invalid", async () => {
@@ -242,17 +213,15 @@ describe("Zoho Books routes", () => {
     const app = createTestApp({ booksClient, invoiceService });
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
+      "get",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
     expect(response.status).toBe(502);
     expect(response.body.error.code).toBe("ZOHO_INVOICE_MAPPING_FAILED");
     expect(response.body.details).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ field: "currency_code" }),
-        ]),
+      expect.arrayContaining([expect.objectContaining({ field: "currency_code" })]),
     );
   });
 
@@ -260,29 +229,26 @@ describe("Zoho Books routes", () => {
     const booksClient = createValidInvoiceBooksClientMock();
 
     vi.mocked(booksClient.getInvoice).mockRejectedValue(
-        new ZohoBooksApiError("Sensitive upstream details", 401),
+      new ZohoBooksApiError("Sensitive upstream details", 401),
     );
 
     const invoiceService = new ZohoInvoiceService(booksClient);
     const app = createTestApp({ booksClient, invoiceService });
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
+      "get",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
     expect(response.status).toBe(502);
     expect(response.body.error.code).toBe("ZOHO_BOOKS_UPSTREAM_ERROR");
-    expect(JSON.stringify(response.body)).not.toContain(
-        "Sensitive upstream details",
-    );
+    expect(JSON.stringify(response.body)).not.toContain("Sensitive upstream details");
   });
 
   it("registers a Pending fiscalization request without issuing a receipt", async () => {
     const booksClient = createValidInvoiceBooksClientMock();
-    const { prepareService, repository } =
-        createPreparationService(booksClient);
+    const { prepareService, repository } = createPreparationService(booksClient);
 
     const app = createTestApp({
       booksClient,
@@ -291,9 +257,9 @@ describe("Zoho Books routes", () => {
     });
 
     const response = await authorizedRequest(
-        "post",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
     expect(response.status).toBe(201);
@@ -304,10 +270,10 @@ describe("Zoho Books routes", () => {
     expect(response.body.request.status).toBeTruthy();
     expect(repository.create).toHaveBeenCalledOnce();
     expect(repository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "request-123",
-          zohoInvoiceId: "invoice-123",
-        }),
+      expect.objectContaining({
+        id: "request-123",
+        zohoInvoiceId: "invoice-123",
+      }),
     );
     expect(booksClient.getInvoice).toHaveBeenCalledWith("invoice-123");
   });
@@ -316,11 +282,7 @@ describe("Zoho Books routes", () => {
     const booksClient = createValidInvoiceBooksClientMock();
 
     const { prepareService } = createPreparationService(booksClient, {
-      create: vi
-          .fn()
-          .mockRejectedValue(
-              new DuplicateZohoInvoiceError("invoice-123"),
-          ),
+      create: vi.fn().mockRejectedValue(new DuplicateZohoInvoiceError("invoice-123")),
     });
 
     const app = createTestApp({
@@ -330,15 +292,13 @@ describe("Zoho Books routes", () => {
     });
 
     const response = await authorizedRequest(
-        "post",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
     expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe(
-        "FISCALIZATION_REQUEST_ALREADY_EXISTS",
-    );
+    expect(response.body.error.code).toBe("FISCALIZATION_REQUEST_ALREADY_EXISTS");
   });
 
   it("does not register an invoice that fails mapping", async () => {
@@ -360,8 +320,7 @@ describe("Zoho Books routes", () => {
       },
     });
 
-    const { prepareService, repository } =
-        createPreparationService(booksClient);
+    const { prepareService, repository } = createPreparationService(booksClient);
 
     const app = createTestApp({
       booksClient,
@@ -370,9 +329,9 @@ describe("Zoho Books routes", () => {
     });
 
     const response = await authorizedRequest(
-        "post",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
     expect(response.status).toBe(422);
@@ -384,21 +343,18 @@ describe("Zoho Books routes", () => {
     const app = createTestApp();
 
     const response = await authorizedRequest(
-        "post",
-        app,
-        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
     expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe(
-        "FISCALIZATION_REQUEST_SERVICE_UNAVAILABLE",
-    );
+    expect(response.body.error.code).toBe("FISCALIZATION_REQUEST_SERVICE_UNAVAILABLE");
   });
 
   it("rejects the endpoint without the invoice API bearer token", async () => {
     const booksClient = createValidInvoiceBooksClientMock();
-    const { prepareService, repository } =
-        createPreparationService(booksClient);
+    const { prepareService, repository } = createPreparationService(booksClient);
 
     const app = createTestApp({
       booksClient,
@@ -407,7 +363,7 @@ describe("Zoho Books routes", () => {
     });
 
     const response = await request(app).post(
-        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
     expect(response.status).toBe(401);
@@ -432,9 +388,9 @@ describe("Zoho Books routes", () => {
     const app = createTestApp({ fiscalizationRepository: repository });
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/fiscalization-requests/request-123",
+      "get",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-123",
     );
 
     expect(response.status).toBe(200);
@@ -462,9 +418,9 @@ describe("Zoho Books routes", () => {
     const app = createTestApp({ fiscalizationRepository: repository });
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/fiscalization-requests/missing-request",
+      "get",
+      app,
+      "/integrations/zoho/fiscalization-requests/missing-request",
     );
 
     expect(response.status).toBe(404);
@@ -476,15 +432,13 @@ describe("Zoho Books routes", () => {
     const app = createTestApp();
 
     const response = await authorizedRequest(
-        "get",
-        app,
-        "/integrations/zoho/fiscalization-requests/request-123",
+      "get",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-123",
     );
 
     expect(response.status).toBe(503);
-    expect(response.body.error.code).toBe(
-        "FISCALIZATION_REPOSITORY_UNAVAILABLE",
-    );
+    expect(response.body.error.code).toBe("FISCALIZATION_REPOSITORY_UNAVAILABLE");
   });
 
   it("rejects fiscalization status lookup without the bearer token", async () => {
@@ -495,10 +449,26 @@ describe("Zoho Books routes", () => {
     const app = createTestApp({ fiscalizationRepository: repository });
 
     const response = await request(app).get(
-        "/integrations/zoho/fiscalization-requests/request-123",
+      "/integrations/zoho/fiscalization-requests/request-123",
     );
 
     expect(response.status).toBe(401);
     expect(repository.findById).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when fiscalization processing is not configured", async () => {
+    const app = createTestApp();
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-123/process",
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("FISCALIZATION_PROCESSING_UNAVAILABLE");
+
+    // Without a configured processing service, the endpoint must not
+    // attempt to retrieve an invoice or communicate with a device.
   });
 });

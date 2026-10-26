@@ -14,13 +14,33 @@ export const envSchema = z
     SQLSERVER_PORT: z.coerce.number().int().min(1).max(65535).default(1433),
     SQLSERVER_ENCRYPT: z.enum(["true", "false"]).default("true"),
     SQLSERVER_TRUST_SERVER_CERTIFICATE: z.enum(["true", "false"]).default("false"),
-      // Protect invoice endpoints from unauthorized access.
-      // Generate a strong random token and keep it out of source control.
-      INVOICE_API_BEARER_TOKEN: z.string().trim().min(32).optional(),
+    // Protect invoice endpoints from unauthorized access.
+    // Generate a strong random token and keep it out of source control.
+    INVOICE_API_BEARER_TOKEN: z.string().trim().min(32).optional(),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z
       .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
       .default("info"),
+    // Stale fiscalization recovery is opt-in and disabled by default.
+    // Environment variables are strings, so do not use z.coerce.boolean():
+    // the string "false" would otherwise be interpreted as true.
+    FISCALIZATION_RECOVERY_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+
+    // Provisional defaults: review before enabling in production.
+    FISCALIZATION_RECOVERY_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5 * 60 * 1000),
+
+    FISCALIZATION_RECOVERY_STALE_AGE_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30 * 60 * 1000),
 
     // Zoho Books OAuth credentials remain optional during development.
     // If provided, each credential must contain a non-whitespace value.
@@ -48,13 +68,13 @@ export const envSchema = z
       });
     }
 
-      if (value.NODE_ENV === "production" && !value.INVOICE_API_BEARER_TOKEN) {
-          context.addIssue({
-              code: "custom",
-              path: ["INVOICE_API_BEARER_TOKEN"],
-              message: "INVOICE_API_BEARER_TOKEN is required in production",
-          });
-      }
+    if (value.NODE_ENV === "production" && !value.INVOICE_API_BEARER_TOKEN) {
+      context.addIssue({
+        code: "custom",
+        path: ["INVOICE_API_BEARER_TOKEN"],
+        message: "INVOICE_API_BEARER_TOKEN is required in production",
+      });
+    }
 
     if (value.DATABASE_PROVIDER === "sqlserver") {
       for (const key of [
