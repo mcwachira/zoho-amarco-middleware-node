@@ -2,6 +2,7 @@ import type {
   FiscalizationFailure,
   FiscalReceipt,
 } from "../../domain/fiscalization/fiscalization-record.js";
+import type { FiscalInvoiceCandidate } from "../zoho/zoho-invoice-mapper.js";
 
 /**
  * The outcome reported by the fiscal-device adapter.
@@ -30,20 +31,22 @@ export type FiscalDeviceResult =
     };
 
 /**
- * Contract for communicating with the fiscal device.
+ * Contract for communicating with a fiscal device.
  *
- * The application layer will depend on this interface rather than
- * depending directly on HTTP, ZFPLabServer, or a specific device SDK.
+ * The application passes a validated invoice candidate rather than
+ * making the device adapter fetch invoice data itself.
  *
- * We will add the validated invoice payload to this contract after
- * confirming the Zoho invoice fields and the relevant device commands.
+ * Implementations must use only verified device commands and must
+ * never blindly retry an operation whose outcome is uncertain.
  */
 export interface FiscalDevice {
-  /**
-   * Executes one fiscal receipt operation.
-   *
-   * Implementations must serialize device commands and must not blindly
-   * retry a command if its outcome could be uncertain.
-   */
-  issueReceipt(): Promise<FiscalDeviceResult>;
+    /**
+     * Attempts to issue a fiscal receipt for the supplied invoice.
+     *
+     * The candidate contains mapped invoice data. It must not be treated
+     * as proof that the invoice satisfies all Kenyan fiscal requirements.
+     */
+    issueReceipt(
+        invoice: FiscalInvoiceCandidate,
+    ): Promise<FiscalDeviceResult>;
 }

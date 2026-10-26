@@ -8,11 +8,71 @@ describe("Environment configuration", () => {
     DATABASE_URL: "postgresql://test:test@localhost:5432/zoho_amarco_test",
   };
 
+
+  it("accepts a valid invoice API bearer token", () => {
+    const token = "a".repeat(64);
+
+    const result = envSchema.safeParse({
+      ...validEnvironment,
+      INVOICE_API_BEARER_TOKEN: token,
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data.INVOICE_API_BEARER_TOKEN).toBe(token);
+    }
+  });
+
+  it("rejects an invoice API bearer token shorter than 32 characters", () => {
+    const result = envSchema.safeParse({
+      ...validEnvironment,
+      INVOICE_API_BEARER_TOKEN: "a".repeat(31),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires an invoice API bearer token in production", () => {
+    const result = envSchema.safeParse({
+      ...validEnvironment,
+      NODE_ENV: "production",
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+          expect.objectContaining({
+            path: ["INVOICE_API_BEARER_TOKEN"],
+            message: "INVOICE_API_BEARER_TOKEN is required in production",
+          }),
+      );
+    }
+  });
+
+  it.each(["development", "test"])(
+      "allows the invoice API bearer token to be omitted in %s",
+      (nodeEnv) => {
+        const result = envSchema.safeParse({
+          ...validEnvironment,
+          NODE_ENV: nodeEnv,
+        });
+
+        expect(result.success).toBe(true);
+
+        if (result.success) {
+          expect(result.data.INVOICE_API_BEARER_TOKEN).toBeUndefined();
+        }
+      },
+  );
+
   it("applies defaults when optional Zoho credentials are omitted", () => {
     const result = envSchema.parse(validEnvironment);
 
     expect(result.ZOHO_CLIENT_ID).toBeUndefined();
     expect(result.ZOHO_CLIENT_SECRET).toBeUndefined();
+    expect(result.ZOHO_ORGANIZATION_ID).toBeUndefined();
     expect(result.ZOHO_REDIRECT_URI).toBe("http://localhost:3000/integrations/zoho/callback");
     expect(result.ZOHO_ACCOUNTS_URL).toBe("https://accounts.zoho.com");
   });
@@ -26,6 +86,24 @@ describe("Environment configuration", () => {
 
     expect(result.ZOHO_CLIENT_ID).toBe("test-client-id");
     expect(result.ZOHO_CLIENT_SECRET).toBe("test-client-secret");
+  });
+
+  it("accepts a Zoho Books organization ID", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      ZOHO_ORGANIZATION_ID: "123456789",
+    });
+
+    expect(result.ZOHO_ORGANIZATION_ID).toBe("123456789");
+  });
+
+  it.each(["", "   "])("rejects a blank Zoho Books organization ID: %j", (organizationId) => {
+    const result = envSchema.safeParse({
+      ...validEnvironment,
+      ZOHO_ORGANIZATION_ID: organizationId,
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("rejects a client ID without a client secret", () => {
@@ -92,4 +170,31 @@ describe("Environment configuration", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("accepts a valid 32-byte hexadecimal OAuth encryption key", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      ZOHO_OAUTH_ENCRYPTION_KEY: "a".repeat(64),
+    });
+
+    expect(result.ZOHO_OAUTH_ENCRYPTION_KEY).toBe("a".repeat(64));
+  });
+
+  it("allows the OAuth encryption key to be omitted during development", () => {
+    const result = envSchema.parse(validEnvironment);
+
+    expect(result.ZOHO_OAUTH_ENCRYPTION_KEY).toBeUndefined();
+  });
+
+  it.each(["", "not-a-key", "a".repeat(63), "g".repeat(64)])(
+    "rejects an invalid OAuth encryption key: %j",
+    (key) => {
+      const result = envSchema.safeParse({
+        ...validEnvironment,
+        ZOHO_OAUTH_ENCRYPTION_KEY: key,
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
 });

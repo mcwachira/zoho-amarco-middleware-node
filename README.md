@@ -2,9 +2,9 @@
 
 **A fiscalization middleware connecting Zoho Books with a Tremol G03 fiscal device and Kenya's KRA/eTIMS ecosystem.**
 
-> **Project status: Foundation implemented; external integrations are in progress.**
+> **Project status: Core foundation and initial Zoho Books integration implemented; device and regulatory integrations remain in progress.**
 >
-> The current codebase includes the fiscalization domain and application service, PostgreSQL and SQL Server persistence implementations, a Tremol ZFP Lab Server client foundation, and automated tests. Zoho Books OAuth and invoice retrieval, verified device command execution, and KRA/eTIMS integration are not yet complete.
+> The current codebase includes the fiscalization domain and application service, PostgreSQL and SQL Server persistence implementations, automated tests, Zoho OAuth authorization and callback handling, Zoho Books invoice retrieval, and read-only invoice-to-fiscal-candidate mapping. Live Zoho integration still requires environment configuration and verification. Verified Tremol G03 receipt issuance and KRA/eTIMS integration remain pending confirmation of the applicable device protocols, APIs, and compliance requirements.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@
 
 Zoho Amarco Middleware is a TypeScript and Node.js service intended to bridge Zoho Books invoicing with fiscal receipt issuance through a Tremol G03 fiscal control unit, while supporting the applicable Kenyan KRA/eTIMS requirements.
 
-The middleware is designed to run on a customer's Windows or Linux server, depending on the final deployment and device connectivity requirements. It will provide a controlled integration layer between cloud-based accounting software, local fiscal hardware, and the persistence needed to track processing outcomes.
+The middleware is designed to run on a customer's Windows or Linux server, depending on the final deployment and device connectivity requirements. It provides an integration foundation between cloud-based accounting software, locally accessible fiscal hardware, and persistent records of processing outcomes.
 
 ### Goals
 
@@ -42,63 +42,87 @@ The middleware is designed to run on a customer's Windows or Linux server, depen
 - Persist receipt identifiers and processing outcomes.
 - Support PostgreSQL and Microsoft SQL Server as database options.
 - Handle device failures and uncertain outcomes without blindly repeating receipt issuance.
-- Provide logging, health checks, automated tests, and a maintainable foundation for production deployment.
+- Provide structured logging, health checks, automated tests, and a maintainable foundation for production deployment.
+- Integrate with the applicable KRA/eTIMS requirements after the required APIs and compliance obligations have been verified.
 
 ## Project Status
 
-| Capability                                      | Status                                                                 |
-| ----------------------------------------------- | ---------------------------------------------------------------------- |
-| TypeScript application foundation               | Implemented                                                            |
-| Express API and health endpoints                | Implemented                                                            |
-| Fiscalization domain and application service    | Implemented                                                            |
-| PostgreSQL repository                           | Implemented and integration-tested                                     |
-| SQL Server repository                           | Implemented; automated repository tests exist                          |
-| Prisma schemas for both database providers      | Implemented                                                            |
-| PostgreSQL Docker Compose configuration         | Implemented                                                            |
-| Tremol ZFP Lab Server client foundation         | Implemented; hardware protocol still requires verification             |
-| Zoho Books OAuth environment configuration      | Implemented and unit-tested                                            |
-| Zoho Books authorization and callback handling  | Planned                                                                |
-| Zoho Books invoice retrieval                    | Planned                                                                |
-| Secure token storage and refresh                | Planned                                                                |
-| Verified G03 receipt issuance                   | Pending device/SDK/protocol verification                               |
-| KRA/eTIMS integration                           | Pending verification of the applicable API and compliance requirements |
-| Production deployment and operational hardening | Pending                                                                |
+| Capability                                        | Status                                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| TypeScript application foundation and Express API | Implemented                                                                         |
+| Health and readiness endpoints                    | Implemented                                                                         |
+| Fiscalization domain and application service      | Implemented; live fiscalization is not yet verified                                 |
+| PostgreSQL repository and integration tests       | Implemented                                                                         |
+| SQL Server repository and automated tests         | Implemented; validate against the target SQL Server environment                     |
+| Prisma schemas for PostgreSQL and SQL Server      | Implemented                                                                         |
+| PostgreSQL Docker Compose development setup       | Implemented                                                                         |
+| Zoho OAuth authorization and callback flow        | Implemented; requires configuration and live-environment verification               |
+| OAuth state handling and PKCE verifier protection | Implemented                                                                         |
+| OAuth token exchange and persistence              | Implemented; production security and recovery still require validation              |
+| Zoho Books invoice retrieval                      | Implemented; requires valid credentials, organization configuration, and API access |
+| Read-only invoice-to-fiscal-candidate mapping     | Implemented and unit-tested                                                         |
+| Verified Tremol G03 receipt issuance              | Pending device, SDK, firmware, and Kenya-specific protocol verification             |
+| KRA/eTIMS integration                             | Pending verification of the applicable API and compliance requirements              |
+| Production deployment and operational hardening   | Pending                                                                             |
 
-These statuses describe the current repository, not a claim of certification or successful live fiscalization.
+**Important:** Implemented application code does not automatically mean that an external integration has been verified against a live service or physical device. The Zoho integration requires live testing. Real fiscal receipt issuance and KRA/eTIMS submission are not yet confirmed.
 
 ## Architecture
 
-The project separates business rules from database and device implementations.
+The project separates business rules from database and external-system implementations.
+
+The current Zoho integration is a read-only path. The fiscalization domain and application service provide a foundation for later processing, but the invoice endpoints do not currently trigger the complete fiscalization workflow.
 
 ```text
 Zoho Books
     |
-    | OAuth 2.0 / Invoice API (planned)
+    | OAuth 2.0 and read-only Invoice API
     v
 Express API
     |
-    v
-Application Layer
+    +---- Zoho OAuth Routes
+    |         |
+    |         +---- OAuth Service
+    |                    |
+    |                    +---- Token Exchange
+    |                    +---- Protected OAuth State / PKCE Data
+    |
+    +---- Zoho Books Invoice Routes
+              |
+              +---- Zoho Invoice Service
+                        |
+                        +---- Invoice Mapper
+                                  |
+                                  +---- Read-only Fiscal Candidate
+
+Fiscalization Application Foundation
     |
     +---- Fiscalization Service
-    |         |
-    |         +---- Fiscalization Repository
-    |         |          |
-    |         |          +---- PostgreSQL
-    |         |          |
-    |         |          +---- SQL Server
-    |         |
-    |         +---- Fiscal Device Interface
-    |                    |
-    |                    +---- Tremol ZFP Lab Server client
-    |
-    v
-Fiscalization Record and Processing Outcome
+              |
+              +---- Fiscalization Repository
+              |          |
+              |          +---- PostgreSQL
+              |          |
+              |          +---- SQL Server
+              |
+              +---- Fiscal Device Interface
+                         |
+                         +---- Tremol ZFP Lab Server Client Foundation
 
-KRA/eTIMS integration: planned, subject to verified requirements.
+KRA/eTIMS Integration
+    |
+    +---- Pending verified API contracts and compliance requirements
 ```
 
+### Current integration boundary
+
+The Zoho invoice endpoints currently stop at invoice retrieval or read-only fiscal-candidate mapping. They do not issue fiscal receipts, send device commands, create fiscalization requests as part of mapping, or submit invoice data to KRA/eTIMS.
+
+The intended end-to-end workflow will only be connected after the invoice mapping, device protocol, receipt reconciliation, and applicable regulatory requirements have been verified.
+
 ### Source layout
+
+The following is a high-level layout of the main modules. Individual files and test names may evolve as development continues.
 
 ```text
 src/
@@ -106,6 +130,9 @@ src/
 ├── server.ts
 ├── config/
 │   └── env.ts
+├── routes/
+│   ├── zoho-oauth-routes.ts
+│   └── zoho-books-routes.ts
 ├── observability/
 │   └── logger.ts
 ├── domain/
@@ -116,11 +143,15 @@ src/
 │       ├── status-transitions.ts
 │       └── status.ts
 ├── application/
-│   └── fiscalization/
-│       ├── fiscal-device.ts
-│       ├── fiscalization-errors.ts
-│       ├── fiscalization-repository.ts
-│       └── fiscalization-service.ts
+│   ├── fiscalization/
+│   │   ├── fiscal-device.ts
+│   │   ├── fiscalization-errors.ts
+│   │   ├── fiscalization-repository.ts
+│   │   └── fiscalization-service.ts
+│   └── zoho/
+│       ├── zoho-oauth-service.ts
+│       ├── zoho-invoice-service.ts
+│       └── zoho-invoice-mapper.ts
 └── infrastructure/
     ├── database/
     │   ├── fiscalization-record-mapper.ts
@@ -129,8 +160,11 @@ src/
     │   ├── postgresql-fiscalization-repository.ts
     │   ├── sqlserver-client.ts
     │   └── sqlserver-fiscalization-repository.ts
-    └── device/
-        └── tremol-zfplabserver-client.ts
+    ├── device/
+    │   └── tremol-zfplabserver-client.ts
+    └── integrations/
+        └── zoho/
+            └── books-client.ts
 
 prisma/
 ├── postgresql/
@@ -140,9 +174,11 @@ prisma/
     └── schema.prisma
 
 tests/
-├── integration/
+├── integrations/
 └── unit/
 ```
+
+Treat this as a guide to the module organization, not an exhaustive inventory of every file. Check the repository when looking for a specific module or test.
 
 ### Layer responsibilities
 
@@ -152,15 +188,15 @@ Defines fiscalization records, statuses, allowed state transitions, and domain o
 
 **Application**
 
-Coordinates the fiscalization use case through interfaces for persistence and device operations. It determines how requests progress and how failures or uncertain outcomes are represented.
+Coordinates application use cases through interfaces for persistence and device operations. It determines how fiscalization requests progress and how failures or uncertain outcomes are represented.
 
 **Infrastructure**
 
-Implements persistence and external-system adapters, including the PostgreSQL and SQL Server repositories and the current Tremol client foundation.
+Implements persistence and external-system adapters, including PostgreSQL and SQL Server repositories, Zoho Books API access, and the current Tremol client foundation.
 
 **API and server**
 
-`src/app.ts` configures the Express application and HTTP middleware. `src/server.ts` initializes runtime dependencies and manages server startup and shutdown.
+`src/app.ts` configures the Express application and HTTP middleware. `src/server.ts` initializes runtime dependencies and manages server startup and shutdown. Route modules expose the available HTTP endpoints.
 
 ## Technology Stack
 
@@ -179,11 +215,11 @@ Implements persistence and external-system adapters, including the PostgreSQL an
 
 Install the following before starting development:
 
-- Node.js version compatible with the project's TypeScript configuration
-- pnpm version specified by `package.json`
+- Node.js compatible with the project's TypeScript configuration
+- The pnpm version specified by `package.json`
 - Git
-- Docker Engine and the Docker Compose plugin, for the PostgreSQL development setup
-- Access to a PostgreSQL instance, or an appropriately configured SQL Server instance
+- Docker Engine and the Docker Compose plugin for the PostgreSQL development setup
+- Access to a PostgreSQL instance or an appropriately configured SQL Server instance
 - A code editor such as Zed or JetBrains Rider
 
 Check your installed tools:
@@ -216,6 +252,8 @@ git pull --ff-only origin dev
 
 Create a feature branch for your work rather than committing integration changes directly to `dev` or `main`.
 
+If your local clone does not yet have a `dev` branch or the remote branch is unavailable, inspect the repository's actual branches before proceeding.
+
 ### 3. Install dependencies
 
 ```bash
@@ -224,7 +262,7 @@ pnpm install --frozen-lockfile
 
 ### 4. Configure environment variables
 
-Create a local `.env` file in the project root. Use the configuration section below as a starting point and provide your own local database credentials.
+Create a local `.env` file in the project root. Use the [Environment Configuration](#environment-configuration) section as a starting point and provide your own local database credentials.
 
 Never commit `.env` or paste its contents into issues, pull requests, or logs.
 
@@ -243,16 +281,19 @@ pnpm db:generate
 
 ```bash
 pnpm typecheck
+pnpm typecheck:tests
 pnpm lint
-pnpm test
+pnpm format:check
+pnpm build
+pnpm vitest run
 pnpm dev
 ```
+
+These commands assume the corresponding scripts exist in the current `package.json`. Use the project's actual scripts if they change.
 
 ## Environment Configuration
 
 The application validates its environment through `src/config/env.ts`.
-
-The following variables are currently defined by the application and database configuration.
 
 ### General settings
 
@@ -266,7 +307,7 @@ The following variables are currently defined by the application and database co
 
 ### PostgreSQL settings
 
-The Compose configuration uses:
+The Docker Compose configuration uses the following variables:
 
 | Variable            | Purpose                        |
 | ------------------- | ------------------------------ |
@@ -292,20 +333,36 @@ The SQL Server connection settings are used by the SQL Server adapter. When sele
 
 ### Zoho Books OAuth settings
 
-The application validates the following Zoho Books OAuth configuration variables. These settings establish the configuration foundation; they do not mean that the authorization flow or invoice API integration is already implemented.
+The application supports a Zoho Books OAuth authorization flow and read-only invoice retrieval.
 
-| Variable             | Purpose                                                                                                                                                                      |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ZOHO_CLIENT_ID`     | Client ID issued for the Zoho API application. Optional until OAuth is configured; if supplied, it must not be blank.                                                        |
-| `ZOHO_CLIENT_SECRET` | Client secret issued for the Zoho API application. Optional until OAuth is configured; if supplied, it must not be blank.                                                    |
-| `ZOHO_REDIRECT_URI`  | OAuth callback URI registered in the Zoho API Console. Defaults to `http://localhost:3000/integrations/zoho/callback`.                                                       |
-| `ZOHO_ACCOUNTS_URL`  | Zoho Accounts authorization server URL for the account's data center. Defaults to `https://accounts.zoho.com`; change it if your Zoho organization uses another data center. |
+| Variable                    | Purpose                                                                                                                                                    |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ZOHO_CLIENT_ID`            | Client ID from the Zoho API Console. Must be configured with the client secret to enable OAuth.                                                            |
+| `ZOHO_CLIENT_SECRET`        | Client secret from the Zoho API Console. Must be supplied together with the client ID.                                                                     |
+| `ZOHO_OAUTH_ENCRYPTION_KEY` | A 32-byte encryption key represented as exactly 64 hexadecimal characters. Required to initialize the OAuth service and protect stored PKCE verifier data. |
+| `ZOHO_ORGANIZATION_ID`      | Zoho Books organization ID. Required for invoice retrieval and invoice mapping.                                                                            |
+| `ZOHO_REDIRECT_URI`         | OAuth callback URI registered in the Zoho API Console. Defaults to `http://localhost:3000/integrations/zoho/callback`.                                     |
+| `ZOHO_ACCOUNTS_URL`         | Zoho Accounts authorization server URL for the organization's data center. Defaults to `https://accounts.zoho.com`.                                        |
 
-The client ID and client secret must be configured together. The application rejects configurations in which only one credential is provided.
+The OAuth service is initialized only when `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, and `ZOHO_OAUTH_ENCRYPTION_KEY` are configured. The client ID and client secret must be supplied together.
 
-The redirect URI must exactly match the URI registered in the Zoho API Console. The default localhost URI is intended for local development; production deployments must use the appropriate registered HTTPS callback.
+Invoice retrieval and fiscal-candidate mapping are initialized only when OAuth is available and `ZOHO_ORGANIZATION_ID` is configured.
 
-Do not commit actual credentials or include them in logs. OAuth authorization, callback validation, token exchange, token refresh, secure token persistence, and Zoho Books invoice retrieval remain separate implementation tasks.
+Generate a development encryption key with:
+
+```bash
+openssl rand -hex 32
+```
+
+This produces a 64-character hexadecimal value. Store it in your local `.env` file and never commit it or print it in logs.
+
+If you rotate the key, account for existing encrypted OAuth data before doing so. Do not assume that existing encrypted data will remain decryptable after a key change.
+
+The redirect URI must exactly match the URI registered in the Zoho API Console. The localhost default is for local development; deployed environments should use the appropriate registered HTTPS callback.
+
+Set `ZOHO_ACCOUNTS_URL` to the correct Zoho Accounts domain for your organization's data center. The default is not appropriate for every Zoho region.
+
+Configuring these variables does not by itself establish successful live authorization. Verify the authorization flow, token persistence, permissions, and invoice access against the intended Zoho organization.
 
 ### Local `.env` example
 
@@ -324,20 +381,27 @@ POSTGRES_DB=zoho_amarco_dev
 
 DATABASE_URL=postgresql://zoho_amarco:replace_with_a_local_password@localhost:5438/zoho_amarco_dev
 
-# Optional until Zoho OAuth is configured.
-# Uncomment and replace both values when you are ready to configure OAuth.
-# ZOHO_CLIENT_ID=
-# ZOHO_CLIENT_SECRET=
+# Configure these together to enable Zoho OAuth.
+ZOHO_CLIENT_ID=replace_with_your_client_id
+ZOHO_CLIENT_SECRET=replace_with_your_client_secret
+
+# Generate with: openssl rand -hex 32
+ZOHO_OAUTH_ENCRYPTION_KEY=replace_with_a_64_character_hex_key
+
+# Required for invoice retrieval and fiscal-candidate mapping.
+ZOHO_ORGANIZATION_ID=replace_with_your_organization_id
 
 ZOHO_REDIRECT_URI=http://localhost:3000/integrations/zoho/callback
 ZOHO_ACCOUNTS_URL=https://accounts.zoho.com
 ```
 
-Replace the placeholder database password with a local development password. URL-encode reserved characters when placing a password in `DATABASE_URL`, and keep the Compose variables consistent with the connection URL.
+Replace all placeholder values with the appropriate local configuration. The encryption key placeholder is not valid until replaced with a generated 64-character hexadecimal key.
 
-The Zoho credential lines are intentionally commented out. The current environment schema permits the credentials to be omitted, but rejects blank values. When configuring OAuth, set both `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET` in your local `.env` file.
+URL-encode reserved characters when placing a password in `DATABASE_URL`, and keep the Compose variables consistent with the connection URL.
 
-Use the Accounts URL appropriate to your Zoho organization's data center. The default shown above is not a guarantee that every Zoho organization should use the US data center.
+The Zoho credentials in this example are intentionally shown as placeholders, not as real credentials. If you do not want to enable OAuth yet, omit the Zoho settings where the environment schema permits it. Do not leave blank credential values if the schema rejects them.
+
+Use the Accounts URL appropriate to your Zoho organization's data center. The default shown above does not guarantee that every Zoho organization should use the US data center.
 
 ## Database Setup
 
@@ -431,35 +495,131 @@ Run the compiled application:
 pnpm start
 ```
 
-Check the configured port and application logs if startup fails. Environment validation can prevent the application from starting when required database configuration is missing.
+Check the configured port and application logs if startup fails. Environment validation can prevent the application from starting when required configuration is missing.
 
 ## API and Health Checks
 
-The current Express application exposes these health endpoints:
+The Express API exposes health endpoints and read-only Zoho Books integration endpoints.
 
-| Endpoint            | Purpose                                                                    |
-| ------------------- | -------------------------------------------------------------------------- |
-| `GET /health/live`  | Indicates that the application process is alive                            |
-| `GET /health/ready` | Checks application readiness, including the configured database dependency |
+The Zoho endpoints are mounted under `/integrations/zoho`. Their availability depends on runtime configuration and the required Zoho credentials.
 
-With the default port, test them using:
+### Health endpoints
+
+| Method | Endpoint        | Purpose                                                         |
+| ------ | --------------- | --------------------------------------------------------------- |
+| `GET`  | `/health/live`  | Indicates that the application process is alive.                |
+| `GET`  | `/health/ready` | Checks whether the configured database dependency is reachable. |
+
+Test the endpoints using the default port:
 
 ```bash
 curl -i http://localhost:3000/health/live
 curl -i http://localhost:3000/health/ready
 ```
 
-The readiness endpoint may report failure when the database is unavailable. That is intentional: a running process is not necessarily ready to process fiscalization requests.
+A successful liveness check returns HTTP `200` with:
 
-The public Zoho callback, invoice lookup, and fiscalization endpoints have not yet been established as a complete external integration contract. Consult the implemented routes and tests before relying on any additional endpoint.
+```json
+{
+  "status": "ok"
+}
+```
+
+A successful readiness check returns HTTP `200` with:
+
+```json
+{
+  "status": "ready"
+}
+```
+
+If the database readiness check fails or is not configured, the readiness endpoint returns HTTP `503` with:
+
+```json
+{
+  "status": "not_ready"
+}
+```
+
+A running process is not necessarily ready to serve requests that depend on the database.
+
+### Zoho OAuth endpoints
+
+| Method | Endpoint                       | Purpose                                                                               |
+| ------ | ------------------------------ | ------------------------------------------------------------------------------------- |
+| `GET`  | `/integrations/zoho/authorize` | Starts OAuth authorization and redirects the browser to Zoho.                         |
+| `GET`  | `/integrations/zoho/callback`  | Processes the authorization callback and exchanges the authorization code for tokens. |
+
+OAuth requires `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, and `ZOHO_OAUTH_ENCRYPTION_KEY`. The encryption key must contain exactly 64 hexadecimal characters. OAuth state and PKCE verifier handling depend on the configured database-backed repositories.
+
+If OAuth is not configured, these endpoints return HTTP `503` with the error code `ZOHO_OAUTH_UNAVAILABLE`.
+
+The callback validates and consumes the OAuth state before processing the result. Invalid or expired state returns HTTP `400` with `INVALID_OAUTH_STATE`. A denied authorization returns `ZOHO_AUTHORIZATION_DENIED`, and a callback without an authorization code returns `INVALID_OAUTH_CALLBACK`.
+
+After a successful code exchange, the callback returns HTTP `200` with a success message. Access and refresh tokens are not included in the response.
+
+These responses describe the implemented application behavior; successful live authorization and production token recovery still require verification.
+
+### Zoho Books invoice endpoints
+
+| Method | Endpoint                                                  | Purpose                                                                      |
+| ------ | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET`  | `/integrations/zoho/invoices/:invoiceId`                  | Retrieves the requested Zoho Books invoice.                                  |
+| `GET`  | `/integrations/zoho/invoices/:invoiceId/fiscal-candidate` | Retrieves the invoice and maps it into the internal fiscal-candidate format. |
+
+Invoice retrieval requires a configured OAuth service and `ZOHO_ORGANIZATION_ID`. The mapping endpoint additionally requires the invoice mapping service, which is initialized when invoice retrieval is configured.
+
+Retrieve an invoice:
+
+```bash
+curl -i \
+  http://localhost:3000/integrations/zoho/invoices/YOUR_INVOICE_ID
+```
+
+Retrieve a fiscal candidate:
+
+```bash
+curl -i \
+  http://localhost:3000/integrations/zoho/invoices/YOUR_INVOICE_ID/fiscal-candidate
+```
+
+Replace `YOUR_INVOICE_ID` with a real Zoho Books invoice ID accessible to the configured Zoho organization.
+
+A successful invoice retrieval returns HTTP `200` with an `invoice` object. A successful mapping returns HTTP `200` with a `candidate` object.
+
+Possible error responses include:
+
+| HTTP status | Error code                         | Meaning                                                             |
+| ----------- | ---------------------------------- | ------------------------------------------------------------------- |
+| `400`       | `INVALID_INVOICE_ID`               | The invoice ID is missing or invalid.                               |
+| `502`       | `ZOHO_BOOKS_UPSTREAM_ERROR`        | Zoho Books could not complete the invoice request.                  |
+| `502`       | `ZOHO_INVOICE_MAPPING_FAILED`      | The retrieved invoice could not be mapped into the internal format. |
+| `503`       | `ZOHO_BOOKS_UNAVAILABLE`           | Invoice retrieval is not configured.                                |
+| `503`       | `ZOHO_INVOICE_SERVICE_UNAVAILABLE` | Invoice mapping is not configured.                                  |
+| `500`       | `INTERNAL_SERVER_ERROR`            | An unexpected server error occurred.                                |
+
+Mapping failures include a `details` array describing the fields that failed validation. Upstream API errors use a generic response rather than exposing internal exception details.
+
+Confirm exact response formats and error behavior against the route implementation when updating this documentation.
+
+### Important safety boundary
+
+Both invoice endpoints are read-only. The fiscal-candidate endpoint validates and maps invoice data; it does not:
+
+- Issue a fiscal receipt.
+- Send commands to a Tremol G03 device.
+- Persist a new fiscalization request as part of the mapping operation.
+- Submit invoice data to KRA/eTIMS.
+
+A successful mapping is not proof that an invoice meets all fiscal-device or Kenyan tax requirements. Those requirements must be verified before device execution is implemented.
 
 ## Fiscalization Workflow
 
-The application foundation models a fiscalization request as a durable process.
+The application foundation models a fiscalization request as a durable process. The workflow below describes the intended domain and application behavior; it is **not yet an end-to-end workflow wired to the Zoho HTTP endpoints**.
 
 At a high level:
 
-1. A request is created or retrieved using the Zoho invoice identifier.
+1. A fiscalization request is created or retrieved using the Zoho invoice identifier.
 2. The repository attempts to claim the pending request atomically.
 3. The application service invokes the fiscal device abstraction.
 4. The result is persisted as a success, failure, or uncertain outcome.
@@ -496,7 +656,7 @@ pnpm test:watch
 Run the PostgreSQL repository integration tests explicitly:
 
 ```bash
-RUN_POSTGRES_INTEGRATION=1 pnpm exec vitest run tests/integration/postgresql-fiscalization-repository.integration.test.ts
+RUN_POSTGRES_INTEGRATION=1 pnpm exec vitest run tests/integrations/postgresql-fiscalization-repository.integrations.test.ts
 ```
 
 The integration test requires a reachable test PostgreSQL database configured through `DATABASE_URL`. Use a dedicated test database, not a production database or a database containing irreplaceable data.
@@ -534,7 +694,15 @@ git diff --check
 git status
 ```
 
+The project's full quality gate can be run with:
+
+```bash
+pnpm typecheck && pnpm typecheck:tests && pnpm lint && pnpm format:check && pnpm build && pnpm vitest run
+```
+
 Unit tests should not require a live Zoho account or physical fiscal device. External integrations should use controlled test doubles or explicitly configured integration environments.
+
+A passing unit test suite does not prove that Zoho OAuth, SQL Server deployment, device receipt issuance, or KRA/eTIMS submission has been verified against live external systems.
 
 ## Device Integration
 
@@ -566,42 +734,47 @@ Do not assume that a generic Tremol example establishes the correct Kenya-specif
 
 ## Zoho Books Integration Roadmap
 
-The integration should be developed incrementally.
+The initial OAuth flow, invoice retrieval, and read-only mapping are implemented. The remaining work is validation, hardening, and connecting these capabilities to a verified fiscalization workflow.
 
-### Phase 1: OAuth and configuration
+### Phase 1: OAuth verification and hardening
 
-- Extend the implemented environment configuration into a complete Zoho Books OAuth integration.
-- Determine the applicable Zoho data center and API domain.
-- Implement authorization and callback handling.
-- Exchange authorization codes for tokens using the documented OAuth flow.
-- Refresh access tokens securely.
-- Store refresh tokens securely, never in source control or ordinary logs.
+- Verify the implemented authorization and callback flow against the intended Zoho organization.
+- Confirm the applicable Zoho data center and API domain.
+- Verify authorization-code exchange, state validation, and PKCE handling.
+- Validate token persistence, refresh-token behavior, and recovery after restarts.
+- Store tokens securely and protect them from source control, logs, and unauthorized access.
 - Request only the scopes required by the implemented operations.
+- Test authorization denial, expired state, missing configuration, token errors, and upstream failures.
 
-### Phase 2: Read-only invoice retrieval
+### Phase 2: Read-only invoice retrieval verification
 
-- Retrieve an invoice using the documented Zoho Books API.
+- Verify invoice retrieval using the documented Zoho Books API.
 - Validate the organization and invoice identifiers.
-- Map the API response into an internal invoice representation.
-- Handle pagination, rate limits, timeouts, and documented API errors.
-- Add unit and integration tests without issuing fiscal receipts.
+- Confirm that the API response is mapped into the expected internal invoice representation.
+- Handle documented API errors, rate limits, timeouts, and any relevant pagination requirements.
+- Test against a controlled Zoho organization without issuing fiscal receipts.
 
 ### Phase 3: Invoice-to-fiscalization mapping
 
 - Define the mapping between invoice lines, quantities, prices, taxes, currency, and the fiscal device's verified requirements.
 - Establish validation rules and a traceable record of the source invoice.
+- Confirm how discounts, rounding, tax categories, credit notes, and unsupported invoice states should be handled.
 - Verify the mapping against authoritative requirements before any device execution.
+- Add tests for invalid, incomplete, and unsupported invoice data.
 
 ### Phase 4: Verified device execution
 
 - Complete and verify the G03 adapter.
+- Establish device readiness checks and safe command sequencing.
 - Test successful issuance, explicit device rejection, timeout, and uncertain outcomes.
 - Persist confirmed receipt identifiers and relevant response data.
 - Ensure recovery procedures never blindly reissue a potentially completed receipt.
+- Integrate the device adapter with the fiscalization application service only after its contract is verified.
 
 ### Phase 5: KRA/eTIMS and production readiness
 
-- Verify the current KRA/eTIMS requirements and applicable integration route.
+- Verify current KRA/eTIMS requirements and the applicable integration route.
+- Confirm whether additional registration, authentication, device, or compliance requirements apply.
 - Implement the required interface only after the API contracts and compliance obligations are confirmed.
 - Add operational monitoring, secure deployment, backup and recovery procedures, and audit logging.
 - Validate the complete workflow in an authorized test environment before production use.
@@ -622,6 +795,8 @@ The following practices are required for production readiness:
 - Back up the database and test recovery procedures.
 - Use authenticated and authorized access for any future fiscalization endpoints.
 - Keep dependencies updated and review security advisories.
+- Verify token refresh, revocation, key rotation, and failure recovery before production deployment.
+- Ensure that health endpoints do not expose credentials or other sensitive configuration.
 
 ## Git Workflow
 
@@ -658,7 +833,7 @@ git push -u origin feature/your-feature-name
 
 Open a pull request into `dev`. Merge into `main` only through the project's release process after the required checks and reviews have passed.
 
-Never commit directly to `main` for routine feature development.
+Never commit directly to `main` for routine feature development. Review the staged diff before committing to ensure it contains only the intended changes and no secrets or unrelated files.
 
 ## Troubleshooting
 
@@ -692,6 +867,30 @@ Review the error and validate the PostgreSQL and SQL Server schemas separately. 
 ### Integration tests fail
 
 Confirm that the test database is reachable and that the integration test is using the intended test connection string. Do not point integration tests at production data.
+
+### Zoho OAuth is unavailable
+
+Confirm that:
+
+- `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET` are both configured.
+- `ZOHO_OAUTH_ENCRYPTION_KEY` contains exactly 64 hexadecimal characters.
+- The callback URI matches the URI registered in the Zoho API Console.
+- The configured Accounts URL matches your organization's data center.
+- Required database-backed OAuth repositories are available.
+
+Do not print client secrets, access tokens, refresh tokens, or encryption keys while troubleshooting.
+
+### Zoho invoice retrieval fails
+
+Confirm that:
+
+- OAuth has been completed successfully for the intended Zoho organization.
+- `ZOHO_ORGANIZATION_ID` is correct.
+- The authorized connection has the required permissions.
+- The invoice ID belongs to the configured organization.
+- The application logs contain no exposed tokens or sensitive invoice information.
+
+Distinguish configuration errors from upstream Zoho API errors before changing the implementation.
 
 ### GitHub credential-helper warnings
 

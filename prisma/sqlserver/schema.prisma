@@ -25,3 +25,34 @@ model FiscalizationRecord {
 
   @@index([status])
 }
+
+
+/// Tracks a single Zoho OAuth authorization attempt.
+///
+/// State is stored as a hash. The PKCE verifier is encrypted because
+/// the original value must be recovered during token exchange.
+model ZohoOAuthAttempt {
+  id                    String    @id @default(cuid()) @db.VarChar(100)
+  stateHash             String    @unique @db.VarChar(64)
+  encryptedCodeVerifier String    @db.VarChar(512)
+  expiresAt             DateTime
+  consumedAt            DateTime?
+  createdAt             DateTime  @default(now())
+
+  // Supports cleanup of expired authorization attempts.
+  @@index([expiresAt])
+}
+
+
+/// Stores the encrypted credentials for the active Zoho connection.
+/// Only one connection ("primary") is supported by the current design.
+model ZohoToken {
+  id                    String   @id @default("primary") @db.VarChar(20)
+  encryptedAccessToken  String   @db.VarChar(2048)
+  encryptedRefreshToken String?  @db.VarChar(2048)
+  accessTokenExpiresAt   DateTime
+  apiDomain              String   @db.VarChar(255)
+  scopes                 String   @db.VarChar(2000)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
