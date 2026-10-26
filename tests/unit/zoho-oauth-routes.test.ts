@@ -172,11 +172,8 @@ describe("Zoho OAuth routes", () => {
     expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
     expect(response.body.error.message).toBe("An unexpected error occurred.");
 
-    expect(JSON.stringify(response.body)).not.toContain(
-      "Sensitive OAuth state storage details",
-    );
+    expect(JSON.stringify(response.body)).not.toContain("Sensitive OAuth state storage details");
 
     expect(oauthService.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
-
 });

@@ -8,6 +8,75 @@ describe("Environment configuration", () => {
     DATABASE_URL: "postgresql://test:test@localhost:5432/zoho_amarco_test",
   };
 
+  it("disables stale fiscalization recovery by default", () => {
+    const result = envSchema.parse(validEnvironment);
+
+    expect(result.FISCALIZATION_RECOVERY_ENABLED).toBe(false);
+    expect(result.FISCALIZATION_RECOVERY_INTERVAL_MS).toBe(300_000);
+    expect(result.FISCALIZATION_RECOVERY_STALE_AGE_MS).toBe(1_800_000);
+  });
+
+  it("enables stale fiscalization recovery only when explicitly configured", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      FISCALIZATION_RECOVERY_ENABLED: "true",
+    });
+
+    expect(result.FISCALIZATION_RECOVERY_ENABLED).toBe(true);
+  });
+
+  it("accepts recovery explicitly disabled as a string", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      FISCALIZATION_RECOVERY_ENABLED: "false",
+    });
+
+    expect(result.FISCALIZATION_RECOVERY_ENABLED).toBe(false);
+  });
+
+  it("rejects an invalid recovery enabled value", () => {
+    const result = envSchema.safeParse({
+      ...validEnvironment,
+      FISCALIZATION_RECOVERY_ENABLED: "yes",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(["FISCALIZATION_RECOVERY_INTERVAL_MS", "FISCALIZATION_RECOVERY_STALE_AGE_MS"] as const)(
+    "rejects zero for %s",
+    (setting) => {
+      const result = envSchema.safeParse({
+        ...validEnvironment,
+        [setting]: "0",
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it.each(["FISCALIZATION_RECOVERY_INTERVAL_MS", "FISCALIZATION_RECOVERY_STALE_AGE_MS"] as const)(
+    "rejects negative values for %s",
+    (setting) => {
+      const result = envSchema.safeParse({
+        ...validEnvironment,
+        [setting]: "-1000",
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it("accepts custom positive integer recovery timings", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      FISCALIZATION_RECOVERY_INTERVAL_MS: "60000",
+      FISCALIZATION_RECOVERY_STALE_AGE_MS: "900000",
+    });
+
+    expect(result.FISCALIZATION_RECOVERY_INTERVAL_MS).toBe(60_000);
+    expect(result.FISCALIZATION_RECOVERY_STALE_AGE_MS).toBe(900_000);
+  });
 
   it("accepts a valid invoice API bearer token", () => {
     const token = "a".repeat(64);
@@ -43,28 +112,28 @@ describe("Environment configuration", () => {
 
     if (!result.success) {
       expect(result.error.issues).toContainEqual(
-          expect.objectContaining({
-            path: ["INVOICE_API_BEARER_TOKEN"],
-            message: "INVOICE_API_BEARER_TOKEN is required in production",
-          }),
+        expect.objectContaining({
+          path: ["INVOICE_API_BEARER_TOKEN"],
+          message: "INVOICE_API_BEARER_TOKEN is required in production",
+        }),
       );
     }
   });
 
   it.each(["development", "test"])(
-      "allows the invoice API bearer token to be omitted in %s",
-      (nodeEnv) => {
-        const result = envSchema.safeParse({
-          ...validEnvironment,
-          NODE_ENV: nodeEnv,
-        });
+    "allows the invoice API bearer token to be omitted in %s",
+    (nodeEnv) => {
+      const result = envSchema.safeParse({
+        ...validEnvironment,
+        NODE_ENV: nodeEnv,
+      });
 
-        expect(result.success).toBe(true);
+      expect(result.success).toBe(true);
 
-        if (result.success) {
-          expect(result.data.INVOICE_API_BEARER_TOKEN).toBeUndefined();
-        }
-      },
+      if (result.success) {
+        expect(result.data.INVOICE_API_BEARER_TOKEN).toBeUndefined();
+      }
+    },
   );
 
   it("applies defaults when optional Zoho credentials are omitted", () => {

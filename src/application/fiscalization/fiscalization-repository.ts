@@ -41,4 +41,16 @@ export interface FiscalizationRepository {
    * Returns false if the record could not be updated under that condition.
    */
   saveOutcome(record: FiscalizationRecord): Promise<boolean>;
+
+  /**
+   * Marks stale InProgress records as OutcomeUnknown.
+   *
+   * The database implementation must atomically update only records that:
+   * - are still InProgress; and
+   * - have an updatedAt timestamp earlier than staleBefore.
+   *
+   * This operation must never reset a record to Pending or call the device.
+   * Returns the number of records moved to OutcomeUnknown.
+   */
+  markStaleInProgressOutcomeUnknown(staleBefore: Date, reason: string): Promise<number>;
 }

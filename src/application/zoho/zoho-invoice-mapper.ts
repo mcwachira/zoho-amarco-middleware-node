@@ -83,17 +83,17 @@ export interface FiscalInvoiceCandidate {
 }
 
 export type InvoiceMappingResult =
-    | {
-  readonly success: true;
-  readonly candidate: FiscalInvoiceCandidate;
-}
-    | {
-  readonly success: false;
-  readonly errors: readonly {
-    readonly field: string;
-    readonly message: string;
-  }[];
-};
+  | {
+      readonly success: true;
+      readonly candidate: FiscalInvoiceCandidate;
+    }
+  | {
+      readonly success: false;
+      readonly errors: readonly {
+        readonly field: string;
+        readonly message: string;
+      }[];
+    };
 
 /**
  * Validates the fields needed for an initial invoice candidate.

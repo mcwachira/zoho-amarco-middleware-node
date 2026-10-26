@@ -8,6 +8,8 @@ import { ZohoInvoiceService } from "./application/zoho/zoho-invoice-service.js";
 import { startZohoOAuthAttemptCleanup } from "./application/zoho/zoho-oauth-attempt-cleanup.js";
 import { RegisterFiscalizationRequestService } from "./application/fiscalization/register-fiscalization-request.js";
 import { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
+import { RecoverStaleFiscalizationsService } from "./application/fiscalization/recover-stale-fiscalizations.js";
+import { startStaleFiscalizationRecoveryWorker } from "./application/fiscalization/stale-fiscalization-recovery-worker.js";
 
 const databaseProvider = createFiscalizationRepositoryProvider();
 
@@ -38,26 +40,19 @@ const booksClient =
 
 const invoiceService = booksClient ? new ZohoInvoiceService(booksClient) : undefined;
 
-const registrationService = new RegisterFiscalizationRequestService(
-    databaseProvider.repository,
-);
+const registrationService = new RegisterFiscalizationRequestService(databaseProvider.repository);
 
 const prepareFiscalizationRequestService = invoiceService
-    ? new PrepareFiscalizationRequestService(
-        invoiceService,
-        registrationService,
-    )
-    : undefined;
+  ? new PrepareFiscalizationRequestService(invoiceService, registrationService)
+  : undefined;
 
 const app = createApp({
-    checkDatabaseConnection: databaseProvider.checkConnection,
-    fiscalizationRepository: databaseProvider.repository,
-    ...(oauthService ? { oauthService } : {}),
-    ...(booksClient ? { booksClient } : {}),
-    ...(invoiceService ? { invoiceService } : {}),
-    ...(prepareFiscalizationRequestService
-        ? { prepareFiscalizationRequestService }
-        : {}),
+  checkDatabaseConnection: databaseProvider.checkConnection,
+  fiscalizationRepository: databaseProvider.repository,
+  ...(oauthService ? { oauthService } : {}),
+  ...(booksClient ? { booksClient } : {}),
+  ...(invoiceService ? { invoiceService } : {}),
+  ...(prepareFiscalizationRequestService ? { prepareFiscalizationRequestService } : {}),
 });
 
 const server = app.listen(env.PORT, () => {
@@ -77,6 +72,16 @@ const oauthAttemptCleanup = startZohoOAuthAttemptCleanup({
   repository: databaseProvider.oauthAttemptRepository,
 });
 
+// Recovery is disabled by default and starts only when explicitly enabled.
+// The worker only marks stale requests OutcomeUnknown; it never retries
+// fiscalization or communicates with the fiscal device.
+const staleFiscalizationRecoveryWorker = env.FISCALIZATION_RECOVERY_ENABLED
+  ? startStaleFiscalizationRecoveryWorker({
+      service: new RecoverStaleFiscalizationsService(databaseProvider.repository),
+      intervalMs: env.FISCALIZATION_RECOVERY_INTERVAL_MS,
+      staleAgeMs: env.FISCALIZATION_RECOVERY_STALE_AGE_MS,
+    })
+  : undefined;
 const SHUTDOWN_TIMEOUT_MS = 30_000;
 
 let shuttingDown = false;
@@ -109,21 +114,32 @@ function shutdown(signal: string): void {
       logger.info("HTTP server closed");
     }
 
-    void oauthAttemptCleanup
-      .stop()
-      .then(() => {
-        logger.info("OAuth attempt cleanup stopped");
+    void Promise.allSettled([
+      oauthAttemptCleanup.stop(),
+      staleFiscalizationRecoveryWorker?.stop() ?? Promise.resolve(),
+    ])
+      .then(async (results) => {
+        const failures = results.filter((result) => result.status === "rejected");
 
-        return databaseProvider.disconnect();
-      })
-      .then(() => {
+        if (failures.length > 0) {
+          for (const failure of failures) {
+            if (failure.status === "rejected") {
+              logger.error({ err: failure.reason }, "Failed to stop a background worker");
+            }
+          }
+
+          // A worker may still be using the database. Do not disconnect it.
+          process.exitCode = 1;
+          return;
+        }
+
+        logger.info("Background workers stopped");
+
+        await databaseProvider.disconnect();
         logger.info("Database client disconnected");
       })
       .catch((error: unknown) => {
-        logger.error(
-          { err: error },
-          "Error while stopping cleanup or disconnecting database client",
-        );
+        logger.error({ err: error }, "Error while disconnecting database client");
         process.exitCode = 1;
       })
       .finally(() => {

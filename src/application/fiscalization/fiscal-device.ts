@@ -40,13 +40,11 @@ export type FiscalDeviceResult =
  * never blindly retry an operation whose outcome is uncertain.
  */
 export interface FiscalDevice {
-    /**
-     * Attempts to issue a fiscal receipt for the supplied invoice.
-     *
-     * The candidate contains mapped invoice data. It must not be treated
-     * as proof that the invoice satisfies all Kenyan fiscal requirements.
-     */
-    issueReceipt(
-        invoice: FiscalInvoiceCandidate,
-    ): Promise<FiscalDeviceResult>;
+  /**
+   * Attempts to issue a fiscal receipt for the supplied invoice.
+   *
+   * The candidate contains mapped invoice data. It must not be treated
+   * as proof that the invoice satisfies all Kenyan fiscal requirements.
+   */
+  issueReceipt(invoice: FiscalInvoiceCandidate): Promise<FiscalDeviceResult>;
 }
