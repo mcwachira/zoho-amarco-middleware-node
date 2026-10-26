@@ -12,6 +12,7 @@ import { requireInvoiceApiToken } from "./middleware/require-invoice-api-token.j
 import type { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
 import type { FiscalizationRepository } from "./application/fiscalization/fiscalization-repository.js";
 import type { FiscalizationService } from "./application/fiscalization/fiscalization-service.js";
+import type { FiscalDeviceDiagnostics } from "./application/fiscalization/fiscal-device-diagnostics.js";
 
 export interface AppDependencies {
   checkDatabaseConnection?: () => Promise<void>;
@@ -22,6 +23,7 @@ export interface AppDependencies {
   prepareFiscalizationRequestService?: PrepareFiscalizationRequestService;
   fiscalizationRepository?: FiscalizationRepository;
   readonly fiscalizationService?: FiscalizationService;
+  readonly fiscalDeviceDiagnostics?: FiscalDeviceDiagnostics;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -42,7 +44,6 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       res.status(503).json({ status: "not_ready" });
       return;
     }
-
     try {
       await dependencies.checkDatabaseConnection();
       res.status(200).json({ status: "ready" });
@@ -51,7 +52,31 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       res.status(503).json({ status: "not_ready" });
     }
   });
+  app.get("/health/device", async (_req, res) => {
+    if (!dependencies.fiscalDeviceDiagnostics) {
+      res.status(503).json({
+        status: "unavailable",
+        component: "device",
+      });
+      return;
+    }
 
+    const result = await dependencies.fiscalDeviceDiagnostics.checkConnection();
+
+    if (result.status === "connected") {
+      res.status(200).json({
+        status: "connected",
+        component: "device",
+      });
+      return;
+    }
+
+    res.status(503).json({
+      status: "unavailable",
+      component: "device",
+      reason: result.reason,
+    });
+  });
   app.use("/integrations/zoho", createZohoOAuthRouter(dependencies.oauthService));
   app.use(
     "/integrations/zoho",

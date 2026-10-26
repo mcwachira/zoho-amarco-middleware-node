@@ -7,6 +7,38 @@ import {
 } from "../../src/infrastructure/device/tremol-zfplabserver-client.js";
 
 describe("TremolZfpLabServerClient", () => {
+
+
+  it("rejects a URL that does not use HTTP or HTTPS", () => {
+    expect(
+        () =>
+            new TremolZfpLabServerClient({
+              baseUrl: "ftp://localhost:4444",
+            }),
+    ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
+  });
+
+  it("rejects URLs containing credentials", () => {
+    expect(
+        () =>
+            new TremolZfpLabServerClient({
+              baseUrl: "http://user:password@localhost:4444",
+            }),
+    ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
+  });
+
+  it("rejects a zero or negative timeout", () => {
+    for (const timeoutMs of [0, -1]) {
+      expect(
+          () =>
+              new TremolZfpLabServerClient({
+                baseUrl: "http://localhost:4444",
+                timeoutMs,
+              }),
+      ).toThrow("timeoutMs must be a positive integer.");
+    }
+  });
+
   it("sends a read command to ZFPLabServer", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
