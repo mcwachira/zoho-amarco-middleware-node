@@ -7,17 +7,24 @@ import type {
 import type { FiscalizationRepository } from "../../src/application/fiscalization/fiscalization-repository.js";
 import {
   FiscalizationClaimError,
-  FiscalizationInvoiceMismatchError,
   FiscalizationPersistenceError,
   FiscalizationRequestNotFoundError,
   FiscalizationService,
 } from "../../src/application/fiscalization/fiscalization-service.js";
 import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
+import {
+  buildFiscalizationSnapshot,
+  FiscalizationSnapshotError,
+  FiscalizationSnapshotMissingError,
+  UnsupportedFiscalizationSnapshotVersionError,
+} from "../../src/application/fiscalization/fiscalization-snapshot.js";
+import type { FiscalizationSnapshot } from "../../src/domain/fiscalization/fiscalization-snapshot.js";
 import { startFiscalization } from "../../src/domain/fiscalization/fiscalization-operations.js";
 import {
   createFiscalizationRecord,
   type FiscalizationRecord,
 } from "../../src/domain/fiscalization/fiscalization-record.js";
+import { makeFiscalizationSnapshot } from "./fiscalization-snapshot-fixture.js";
 
 const invoice: FiscalInvoiceCandidate = {
   zohoInvoiceId: "zoho-invoice-001",
@@ -44,10 +51,46 @@ const invoice: FiscalInvoiceCandidate = {
   total: "348",
 };
 
-const input = {
-  id: "fiscalization-001",
+const snapshotResult = await buildFiscalizationSnapshot({
   invoice,
-};
+  zohoOrganizationId: "organization-1",
+  registeredAt: new Date("2026-10-27T00:00:00.000Z"),
+  customerProfiles: {
+    findByZohoCustomerId: vi.fn().mockResolvedValue({
+      id: "customer-profile-1",
+      zohoCustomerId: "customer-1",
+      companyName: "Example Ltd",
+      clientPin: "P051234567X",
+      headquarters: "Nairobi",
+      address: "Main Road",
+      postalCodeAndCity: "00100 Nairobi",
+      exemptionNumber: null,
+      createdAt: new Date("2026-10-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-10-26T00:00:00.000Z"),
+    }),
+  },
+  itemProfiles: {
+    findByZohoItemId: vi.fn().mockResolvedValue({
+      id: "item-profile-1",
+      zohoItemId: "item-1",
+      measureUnit: "EA",
+      hsCode: "1234.56.78",
+      hsName: "Test product",
+      vatClass: "A",
+      vatGroupRate: "16.00",
+      createdAt: new Date("2026-10-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-10-26T00:00:00.000Z"),
+    }),
+  },
+});
+
+if (!snapshotResult.success) {
+  throw new Error("Unable to create the fiscalization-service test snapshot.");
+}
+
+const snapshot: FiscalizationSnapshot = snapshotResult.snapshot;
+const otherOrganizationSnapshot = await makeFiscalizationSnapshot(invoice, "another-organization");
+const input = { id: "fiscalization-001" };
 
 const successfulResult: FiscalDeviceResult = {
   kind: "succeeded",
@@ -56,6 +99,13 @@ const successfulResult: FiscalDeviceResult = {
     issuedAt: new Date("2026-10-23T06:00:00.000Z"),
   },
 };
+
+const verifiedTestPolicy = {
+  enabled: true,
+  paymentSourceVerified: true,
+  taxRulesVerified: true,
+  deviceContractVerified: true,
+} as const;
 
 /**
  * Creates an in-memory repository with an already-registered record.
@@ -69,6 +119,9 @@ function createRepository(initialRecord: FiscalizationRecord, events: string[] =
       events.push("find");
       return currentRecord?.id === id ? currentRecord : null;
     }),
+    findByZohoInvoiceId: vi.fn(async (zohoInvoiceId: string) =>
+      currentRecord?.zohoInvoiceId === zohoInvoiceId ? currentRecord : null,
+    ),
 
     create: vi.fn(async (record: FiscalizationRecord): Promise<void> => {
       events.push("create");
@@ -134,12 +187,18 @@ function createHarness(result?: FiscalDeviceResult) {
   // Processing must begin with a record registered before this service runs.
   const pendingRecord = createFiscalizationRecord({
     id: input.id,
-    zohoInvoiceId: input.invoice.zohoInvoiceId,
+    zohoInvoiceId: invoice.zohoInvoiceId,
+    snapshot,
   });
 
   const { repository, getCurrentRecord } = createRepository(pendingRecord, events);
   const device = createDevice(events, result);
-  const service = new FiscalizationService(repository, device);
+  const service = new FiscalizationService(
+    repository,
+    device,
+    "organization-1",
+    verifiedTestPolicy,
+  );
 
   return {
     events,
@@ -151,6 +210,25 @@ function createHarness(result?: FiscalDeviceResult) {
 }
 
 describe("FiscalizationService", () => {
+  it("blocks issuance by default before reading, claiming, or calling the device", async () => {
+    const { repository, device } = createHarness();
+    const guardedService = new FiscalizationService(repository, device, "organization-1");
+
+    await expect(guardedService.fiscalize(input)).rejects.toMatchObject({
+      name: "FiscalizationIssuanceDisabledError",
+      blockers: [
+        "issuance_disabled",
+        "payment_source_unverified",
+        "tax_rules_unverified",
+        "device_contract_unverified",
+      ],
+    });
+
+    expect(repository.findById).not.toHaveBeenCalled();
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
   it("loads and claims an existing record before calling the device", async () => {
     const { service, events, repository, device } = createHarness();
 
@@ -161,7 +239,7 @@ describe("FiscalizationService", () => {
     expect(repository.create).not.toHaveBeenCalled();
     expect(repository.claimPending).toHaveBeenCalledWith(input.id);
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
-    expect(device.issueReceipt).toHaveBeenCalledWith(invoice);
+    expect(device.issueReceipt).toHaveBeenCalledWith(snapshot);
     expect(result.status).toBe("Succeeded");
   });
 
@@ -179,24 +257,92 @@ describe("FiscalizationService", () => {
     expect(device.issueReceipt).not.toHaveBeenCalled();
   });
 
-  it("rejects an invoice that does not match the registered request", async () => {
+  it("rejects a snapshot whose invoice identity does not match the registered request", async () => {
     const { service, repository, device } = createHarness();
 
-    const mismatchedInput = {
+    const pending = createFiscalizationRecord({
       id: input.id,
-      invoice: {
-        ...invoice,
-        zohoInvoiceId: "different-zoho-invoice",
-      },
-    };
+      zohoInvoiceId: "registered-invoice",
+      snapshot,
+    });
+    repository.findById.mockResolvedValue(pending);
 
-    await expect(service.fiscalize(mismatchedInput)).rejects.toBeInstanceOf(
-      FiscalizationInvoiceMismatchError,
-    );
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationSnapshotError);
 
     expect(repository.findById).toHaveBeenCalledWith(input.id);
     expect(repository.claimPending).not.toHaveBeenCalled();
     expect(repository.create).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("rejects a snapshot from a different configured Zoho organization", async () => {
+    const { service, repository, device } = createHarness();
+    repository.findById.mockResolvedValue(
+      createFiscalizationRecord({
+        id: input.id,
+        zohoInvoiceId: invoice.zohoInvoiceId,
+        snapshot: otherOrganizationSnapshot,
+      }),
+    );
+
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationSnapshotError);
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("rejects a tampered snapshot before claim or device", async () => {
+    const { service, repository, device } = createHarness();
+    const malformedSnapshot = {
+      ...snapshot,
+      invoice: { ...snapshot.invoice, total: "not-a-decimal" },
+    } as FiscalizationSnapshot;
+    repository.findById.mockResolvedValue(
+      createFiscalizationRecord({
+        id: input.id,
+        zohoInvoiceId: invoice.zohoInvoiceId,
+        snapshot: malformedSnapshot,
+      }),
+    );
+
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(FiscalizationSnapshotError);
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("rejects legacy requests without a snapshot before claim or device", async () => {
+    const { service, repository, device } = createHarness();
+    repository.findById.mockResolvedValue(
+      createFiscalizationRecord({
+        id: input.id,
+        zohoInvoiceId: invoice.zohoInvoiceId,
+      }),
+    );
+
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
+      FiscalizationSnapshotMissingError,
+    );
+    expect(repository.claimPending).not.toHaveBeenCalled();
+    expect(device.issueReceipt).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unsupported snapshot version before claim or device", async () => {
+    const { service, repository, device } = createHarness();
+    const unsupported = {
+      ...snapshot,
+      schemaVersion: 2,
+    } as unknown as FiscalizationSnapshot;
+    repository.findById.mockResolvedValue(
+      createFiscalizationRecord({
+        id: input.id,
+        zohoInvoiceId: invoice.zohoInvoiceId,
+        snapshot: unsupported,
+      }),
+    );
+
+    await expect(service.fiscalize(input)).rejects.toBeInstanceOf(
+      UnsupportedFiscalizationSnapshotVersionError,
+    );
+    expect(repository.claimPending).not.toHaveBeenCalled();
     expect(device.issueReceipt).not.toHaveBeenCalled();
   });
 
@@ -209,6 +355,26 @@ describe("FiscalizationService", () => {
 
     expect(device.issueReceipt).not.toHaveBeenCalled();
     expect(repository.saveOutcome).not.toHaveBeenCalled();
+  });
+
+  it("allows only one concurrent request to claim and call the device", async () => {
+    const { service, repository, device } = createHarness();
+
+    const results = await Promise.allSettled([service.fiscalize(input), service.fiscalize(input)]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(results).toEqual(
+      expect.arrayContaining([
+        {
+          status: "rejected",
+          reason: expect.any(FiscalizationClaimError),
+        },
+      ]),
+    );
+    expect(repository.claimPending).toHaveBeenCalledTimes(2);
+    expect(device.issueReceipt).toHaveBeenCalledTimes(1);
+    expect(repository.saveOutcome).toHaveBeenCalledTimes(1);
   });
 
   it("records a successful receipt", async () => {
@@ -243,6 +409,27 @@ describe("FiscalizationService", () => {
     expect(getCurrentRecord()?.status).toBe("OutcomeUnknown");
     expect(device.issueReceipt).toHaveBeenCalledTimes(1);
     expect(repository.saveOutcome).toHaveBeenCalledTimes(1);
+  });
+
+  it("records an unknown outcome when the receipt issue date is invalid", async () => {
+    const invalidResult: FiscalDeviceResult = {
+      kind: "succeeded",
+      receipt: {
+        receiptNumber: "CU-000124",
+        issuedAt: new Date("invalid-date"),
+      },
+    };
+
+    const { service, device, repository, getCurrentRecord } = createHarness(invalidResult);
+
+    const result = await service.fiscalize(input);
+
+    expect(result.status).toBe("OutcomeUnknown");
+    expect(result.receipt).toBeNull();
+    expect(result.outcomeUnknownReason).toContain("Receipt issue date must be valid.");
+    expect(getCurrentRecord()?.status).toBe("OutcomeUnknown");
+    expect(repository.saveOutcome).toHaveBeenCalledTimes(1);
+    expect(device.issueReceipt).toHaveBeenCalledTimes(1);
   });
 
   it("records a confirmed device failure", async () => {

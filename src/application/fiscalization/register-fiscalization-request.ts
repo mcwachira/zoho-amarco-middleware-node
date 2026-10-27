@@ -1,9 +1,11 @@
 import type { FiscalizationRepository } from "./fiscalization-repository.js";
 import type { FiscalInvoiceCandidate } from "../zoho/zoho-invoice-mapper.js";
+import type { FiscalizationSnapshot } from "../../domain/fiscalization/fiscalization-snapshot.js";
 import {
   createFiscalizationRecord,
   type FiscalizationRecord,
 } from "../../domain/fiscalization/fiscalization-record.js";
+import { parseFiscalizationSnapshot } from "./fiscalization-snapshot.js";
 
 /**
  * Input needed to register a fiscalization request.
@@ -13,6 +15,7 @@ import {
 export interface RegisterFiscalizationRequestInput {
   readonly id: string;
   readonly invoice: FiscalInvoiceCandidate;
+  readonly snapshot: FiscalizationSnapshot;
 }
 
 /**
@@ -24,11 +27,24 @@ export interface RegisterFiscalizationRequestInput {
 export class RegisterFiscalizationRequestService {
   constructor(private readonly repository: FiscalizationRepository) {}
 
+  findExisting(zohoInvoiceId: string): Promise<FiscalizationRecord | null> {
+    return this.repository.findByZohoInvoiceId(zohoInvoiceId);
+  }
+
   async register(input: RegisterFiscalizationRequestInput): Promise<FiscalizationRecord> {
-    const record = createFiscalizationRecord({
-      id: input.id,
-      zohoInvoiceId: input.invoice.zohoInvoiceId,
-    });
+    const snapshot = parseFiscalizationSnapshot(input.snapshot, input.snapshot.schemaVersion);
+    if (JSON.stringify(snapshot.invoice) !== JSON.stringify(input.invoice)) {
+      throw new Error("Fiscalization snapshot does not match the invoice registration input.");
+    }
+
+    const record = createFiscalizationRecord(
+      {
+        id: input.id,
+        zohoInvoiceId: input.invoice.zohoInvoiceId,
+        snapshot,
+      },
+      new Date(snapshot.registeredAt),
+    );
 
     await this.repository.create(record);
 
