@@ -5,6 +5,7 @@ import { RecoverStaleFiscalizationsService } from "../../src/application/fiscali
 function createRepository() {
   return {
     findById: vi.fn(),
+    findByZohoInvoiceId: vi.fn(),
     create: vi.fn(),
     claimPending: vi.fn(),
     saveOutcome: vi.fn(),
