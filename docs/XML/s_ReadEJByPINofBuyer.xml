@@ -1,0 +1,20 @@
+﻿<Command Name="ReadEJByPINofBuyer" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by PIN number of buyer.</FPOperation>
+  <Args>
+    <Arg Name="" Value="J0" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionPINReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="p" />
+        <Option Name="Detailed EJ" Value="P" />
+      </Options>
+      <Desc>1 character with value 
+ - 'P' - Detailed EJ 
+ - 'p' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="PINnumber" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for PIN number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'J0'> <;> <PINReportFormat[1]> <;> <PINnumber[11]>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

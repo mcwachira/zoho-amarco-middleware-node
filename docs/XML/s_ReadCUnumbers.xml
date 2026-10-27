@@ -1,0 +1,12 @@
+﻿<Command Name="ReadCUnumbers" CmdByte="0x60">
+  <FPOperation>Provides information about the manufacturing number of the CU and PIN number.</FPOperation>
+  <Response ACK="false">
+    <Res Name="SerialNumber" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols for individual number of the CU</Desc>
+    </Res>
+    <Res Name="PINnumber" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for pin number</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<SerialNumber[20]><;><PINnumber[11]>]]></ResFormatRaw>
+  </Response>
+</Command>

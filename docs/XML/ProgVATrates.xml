@@ -1,0 +1,10 @@
+﻿<Command Name="ProgVATrates">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="VATrateA" Value="" />
+    <Arg Name="VATrateB" Value="" />
+    <Arg Name="VATrateC" Value="" />
+    <Arg Name="VATrateD" Value="" />
+    <Arg Name="VATrateE" Value="" />
+  </Args>
+</Command>

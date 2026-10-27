@@ -1,0 +1,18 @@
+﻿<Command Name="Read_ServerReadingTimeout" CmdByte="0x4E">
+  <FPOperation>Provides information about timeout when reading from a server. This time is in the seconds. Minimum value: 120, maximum value: 6000.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'S'><;><'R'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="ReadingTimeout" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>(Timeout) 4 symbols for timeout in format ####</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'S'><;><'R'><;> <ReadingTimeout[4]>]]></ResFormatRaw>
+  </Response>
+</Command>

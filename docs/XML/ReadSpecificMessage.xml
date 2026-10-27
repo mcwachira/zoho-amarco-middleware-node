@@ -1,0 +1,14 @@
+﻿<Command Name="ReadSpecificMessage">
+  <Args>
+    <Arg Name="MessageNum" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="L" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="MessageNum" Value="" Type="Text" MaxLen="2" />
+    <Res Name="DateTime" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm" />
+    <Res Name="Type" Value="" Type="Text" MaxLen="1" />
+    <Res Name="Code" Value="" Type="Text" MaxLen="3" />
+    <Res Name="MessageText" Value="" Type="Text" MaxLen="128" />
+  </Response>
+</Command>

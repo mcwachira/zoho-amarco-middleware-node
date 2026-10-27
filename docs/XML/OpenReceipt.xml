@@ -1,0 +1,11 @@
+﻿<Command Name="OpenReceipt">
+  <Args>
+    <Arg Name="OptionReceiptFormat" Value="">
+      <Options>
+        <Option Name="Brief" Value="0" />
+        <Option Name="Detailed" Value="1" />
+      </Options>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" />
+  </Args>
+</Command>

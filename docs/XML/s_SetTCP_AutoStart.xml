@@ -1,0 +1,18 @@
+﻿<Command Name="SetTCP_AutoStart" CmdByte="0x4E">
+  <FPOperation>Program device's autostart TCP conection in sale/line mode. To apply use -SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="2" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionTCPAutoStart" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0' - No 
+ - '1' - Yes</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'Z'><;><'2'><;><TCPAutoStart[1]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

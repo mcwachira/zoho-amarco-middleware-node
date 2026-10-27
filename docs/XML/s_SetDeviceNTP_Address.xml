@@ -1,0 +1,15 @@
+﻿<Command Name="SetDeviceNTP_Address" CmdByte="0x4E">
+  <FPOperation>Program device's NTP address . To apply use - SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="AddressLen" Value="" Type="Decimal" MaxLen="3">
+      <Desc>Up to 3 symbols for the address length</Desc>
+    </Arg>
+    <Arg Name="NTPAddress" Value="" Type="Text" MaxLen="50">
+      <Desc>50 symbols for the device's NTP address</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'S'><;><'N'> <;><AddressLen[1..3]><;><NTPAddress[50]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

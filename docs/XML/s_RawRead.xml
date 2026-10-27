@@ -1,0 +1,16 @@
+﻿<Command Name="RawRead" CmdByte="0xFF">
+  <FPOperation> Reads raw bytes from FP.</FPOperation>
+  <Args>
+    <Arg Name="Count" Value="" Type="Decimal" MaxLen="5">
+      <Desc>How many bytes to read if EndChar is not specified</Desc>
+    </Arg>
+    <Arg Name="EndChar" Value="" Type="Text" MaxLen="1">
+      <Desc>The character marking the end of the data. If present Count parameter is ignored.</Desc>
+    </Arg>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Bytes" Value="" Type="Base64" MaxLen="100000">
+      <Desc>FP raw response in BASE64 encoded string</Desc>
+    </Res>
+  </Response>
+</Command>

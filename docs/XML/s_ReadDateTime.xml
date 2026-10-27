@@ -1,0 +1,9 @@
+﻿<Command Name="ReadDateTime" CmdByte="0x68">
+  <FPOperation>Provides information about the current date and time.</FPOperation>
+  <Response ACK="false">
+    <Res Name="DateTime" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm">
+      <Desc>Date Time parameter in format: DD-MM-YY [Space] hh:mm</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<DateTime "DD-MM-YYYY HH:MM">]]></ResFormatRaw>
+  </Response>
+</Command>

@@ -1,0 +1,8 @@
+﻿<Command Name="SaveNetworkSettings" CmdByte="0x4E">
+  <FPOperation>After every change on Idle timeout, LAN/WiFi/GPRS usage, LAN/WiFi/TCP/GPRS password or TCP auto start networks settings this Save command needs to be execute.</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="A" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'A'> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

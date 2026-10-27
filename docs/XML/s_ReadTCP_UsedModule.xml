@@ -1,0 +1,24 @@
+﻿<Command Name="ReadTCP_UsedModule" CmdByte="0x4E">
+  <FPOperation>Provides information about which module the device is in use: LAN or WiFi module. This information can be provided if the device has mounted both modules.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'Z'><;><'U'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionUsedModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="LAN module" Value="1" />
+        <Option Name="WiFi module" Value="2" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '1' - LAN module 
+ - '2' - WiFi module</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'Z'><;><'U'><;><UsedModule[1]>]]></ResFormatRaw>
+  </Response>
+</Command>

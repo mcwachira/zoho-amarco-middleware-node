@@ -1,0 +1,6 @@
+﻿<Command Name="SetGPRS_APN">
+  <Args>
+    <Arg Name="gprsAPNlength" Value="" />
+    <Arg Name="APN" Value="" />
+  </Args>
+</Command>

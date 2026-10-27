@@ -1,0 +1,18 @@
+﻿<Command Name="ReadTotalMessagesCount" CmdByte="0x4E">
+  <FPOperation>Reads all messages from log</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="L" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'L'><;><'0'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="L" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Count" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for the messages count</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'L'><;><'0'><;><Count[3]>]]></ResFormatRaw>
+  </Response>
+</Command>

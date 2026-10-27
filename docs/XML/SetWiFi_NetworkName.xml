@@ -1,0 +1,6 @@
+﻿<Command Name="SetWiFi_NetworkName">
+  <Args>
+    <Arg Name="WiFiNameLength" Value="" />
+    <Arg Name="WiFiNetworkName" Value="" />
+  </Args>
+</Command>

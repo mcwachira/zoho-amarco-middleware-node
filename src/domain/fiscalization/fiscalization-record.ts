@@ -1,4 +1,5 @@
 import type { FiscalizationStatus } from "./status.js";
+import type { FiscalizationSnapshot } from "./fiscalization-snapshot.js";
 
 /**
  * Details that identify a successfully issued fiscal receipt.
@@ -41,6 +42,10 @@ export interface FiscalizationRecord {
   /** The stable invoice identifier received from Zoho Books. */
   readonly zohoInvoiceId: string;
 
+  /** Immutable source inputs captured before the request becomes Pending. */
+  readonly snapshot: FiscalizationSnapshot | null;
+  readonly snapshotVersion: number | null;
+
   /** The current state of this fiscalization attempt. */
   readonly status: FiscalizationStatus;
 
@@ -68,6 +73,7 @@ export interface FiscalizationRecord {
 export interface CreateFiscalizationRecordInput {
   readonly id: string;
   readonly zohoInvoiceId: string;
+  readonly snapshot?: FiscalizationSnapshot | null;
 }
 
 /**
@@ -105,6 +111,8 @@ export function createFiscalizationRecord(
   return {
     id,
     zohoInvoiceId,
+    snapshot: input.snapshot ?? null,
+    snapshotVersion: input.snapshot?.schemaVersion ?? null,
     outcomeUnknownReason: null,
     status: "Pending",
     createdAt: timestamp,

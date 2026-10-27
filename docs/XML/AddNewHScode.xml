@@ -1,0 +1,14 @@
+﻿<Command Name="AddNewHScode">
+  <Args>
+    <Arg Name="HS_Code" Value="" />
+    <Arg Name="HS_Name" Value="" />
+    <Arg Name="OptionTaxable" Value="">
+      <Options>
+        <Option Name="Exempted" Value="1" />
+        <Option Name="Taxable" Value="0" />
+      </Options>
+    </Arg>
+    <Arg Name="MesureUnit" Value="" />
+    <Arg Name="VAT_rate" Value="" />
+  </Args>
+</Command>

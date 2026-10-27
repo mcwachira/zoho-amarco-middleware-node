@@ -1,0 +1,15 @@
+﻿<Command Name="ReadDiagnostics">
+  <Response ACK="false">
+    <Res Name="OptionDeviceType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="A Type" Value="1" />
+        <Option Name="B Type" Value="2" />
+      </Options>
+    </Res>
+    <Res Name="SDIdxPos" Value="" Type="Text" MaxLen="10" />
+    <Res Name="LastInvoiceCUNum" Value="" Type="Text" MaxLen="19" />
+    <Res Name="LastInvoiceDate" Value="" Type="Text" MaxLen="6" />
+    <Res Name="LastEODDate" Value="" Type="Text" MaxLen="6" />
+    <Res Name="InvoicesSent" Value="" Type="Text" MaxLen="4" />
+  </Response>
+</Command>

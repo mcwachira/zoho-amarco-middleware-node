@@ -1,0 +1,65 @@
+﻿<Command Name="ReadCurrentReceiptInfo" CmdByte="0x72">
+  <FPOperation>Read the current status of the receipt.</FPOperation>
+  <Response ACK="false">
+    <Res Name="OptionIsReceiptOpened" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <Res Name="SalesNumber" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for number of sales</Desc>
+    </Res>
+    <Res Name="SubtotalAmountVATGA" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for subtotal by VAT group A</Desc>
+    </Res>
+    <Res Name="SubtotalAmountVATGB" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for subtotal by VAT group B</Desc>
+    </Res>
+    <Res Name="SubtotalAmountVATGC" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for subtotal by VAT group C</Desc>
+    </Res>
+    <Res Name="SubtotalAmountVATGD" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for subtotal by VAT group D</Desc>
+    </Res>
+    <Res Name="SubtotalAmountVATGE" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for subtotal by VAT group E</Desc>
+    </Res>
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionReceiptFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief" Value="0" />
+        <Option Name="Detailed" Value="1" />
+      </Options>
+      <Desc>(Format) 1 symbol with value: 
+ - '1' - Detailed 
+ - '0' - Brief</Desc>
+    </Res>
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionClientReceipt" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="invoice (client) receipt" Value="1" />
+        <Option Name="standard receipt" Value="0" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '1' - invoice (client) receipt 
+ - '0' - standard receipt</Desc>
+    </Res>
+    <Res Name="OptionPowerDownInReceipt" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+- '0' - No 
+- '1' - Yes</Desc>
+    </Res>
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <ResFormatRaw><![CDATA[<IsReceiptOpened[1]> <;> <SalesNumber[3]> <;> <SubtotalAmountVATGA[1..13]> <;> <SubtotalAmountVATGB[1..13]> <;> <SubtotalAmountVATGC[1..13]> <;> <SubtotalAmountVATGD[1..13]> <;> <SubtotalAmountVATGE[1..13]> <;> <reserved['0']> <;><reserved['0']> <;> <ReceiptFormat[1]> <;> <reserved['0']> <;> <reserved['0']> <;> <ClientReceipt[1]> <;> <PowerDownInReceipt[1]> <;> <reserved['0']>]]></ResFormatRaw>
+  </Response>
+</Command>

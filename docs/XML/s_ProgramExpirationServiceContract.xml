@@ -1,0 +1,22 @@
+﻿<Command Name="ProgramExpirationServiceContract" CmdByte="0x5A">
+  <FPOperation>Program expiration date of the service contract</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="B" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Password" Value="" Type="Text" MaxLen="5">
+      <Desc>5 symbols for password</Desc>
+    </Arg>
+    <Arg Name="OptionActivation" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0'- No 
+ - '1'- Yes</Desc>
+    </Arg>
+    <Arg Name="ExpiryDate" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>6 symbols for date in format DDMMYY</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['B']> <;><Password[5]> <;><Activation[1]> <;><ExpiryDate "DDMMYY"> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

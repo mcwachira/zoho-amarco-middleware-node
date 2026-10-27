@@ -1,0 +1,28 @@
+﻿<Command Name="ReadEJByTraderSystemInvNum_JSON" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by Trader System Invoice Number (Single Invoice) in the JSON format. The number of bytes equal to Length for JSON data must be read subsequently.</FPOperation>
+  <Args>
+    <Arg Name="" Value="JY" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionTraderSystemReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+      <Desc>1 character with value 
+ - 'S' - Detailed EJ 
+ - 's' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for trader system invoice 
+number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'JY'> <;> < TraderSystemReportFormat[1]> <;> <TraderSystemInvNum[15]> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10">
+      <Desc>Up to 10 symbols for length</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'JY'> <;> <'Z'> <;> <Length[1..10]>]]></ResFormatRaw>
+  </Response>
+</Command>

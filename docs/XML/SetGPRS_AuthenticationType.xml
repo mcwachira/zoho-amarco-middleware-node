@@ -1,0 +1,12 @@
+﻿<Command Name="SetGPRS_AuthenticationType">
+  <Args>
+    <Arg Name="OptionAuthenticationType" Value="">
+      <Options>
+        <Option Name="CHAP" Value="2" />
+        <Option Name="None" Value="0" />
+        <Option Name="PAP" Value="1" />
+        <Option Name="PAP or CHAP" Value="3" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

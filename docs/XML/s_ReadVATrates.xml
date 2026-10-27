@@ -1,0 +1,21 @@
+﻿<Command Name="ReadVATrates" CmdByte="0x62">
+  <FPOperation>Provides information about the current VAT rates (the last value stored in FM).</FPOperation>
+  <Response ACK="false">
+    <Res Name="VATrateA" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%">
+      <Desc>(VAT rate A) Up to 7 symbols for VATrates of VAT class A in format ##.##%</Desc>
+    </Res>
+    <Res Name="VATrateB" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%">
+      <Desc>(VAT rate B) Up to 7 symbols for VATrates of VAT class B in format ##.##%</Desc>
+    </Res>
+    <Res Name="VATrateC" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%">
+      <Desc>(VAT rate C) Up to 7 symbols for VATrates of VAT class C in format ##.##%</Desc>
+    </Res>
+    <Res Name="VATrateD" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%">
+      <Desc>(VAT rate D) Up to 7 symbols for VATrates of VAT class D in format ##.##%</Desc>
+    </Res>
+    <Res Name="VATrateE" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%">
+      <Desc>(VAT rate E) Up to 7 symbols for VATrates of VAT class E in format ##.##%</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<VATrateA[1..7]> <;> <VATrateB[1..7]> <;> <VATrateC[1..7]> <;> <VATrateD[1..7]> <;> <VATrateE[1..7]>]]></ResFormatRaw>
+  </Response>
+</Command>

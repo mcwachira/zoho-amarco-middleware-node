@@ -1,0 +1,6 @@
+﻿<Command Name="ProgramProxyServerAddress">
+  <Args>
+    <Arg Name="ParamLength" Value="" />
+    <Arg Name="Address" Value="" />
+  </Args>
+</Command>

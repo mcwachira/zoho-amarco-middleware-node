@@ -1,0 +1,9 @@
+﻿<Command Name="ReadVATrates">
+  <Response ACK="false">
+    <Res Name="VATrateA" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%" />
+    <Res Name="VATrateB" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%" />
+    <Res Name="VATrateC" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%" />
+    <Res Name="VATrateD" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%" />
+    <Res Name="VATrateE" Value="" Type="Decimal_with_format" MaxLen="7" Format="00.00%" />
+  </Response>
+</Command>

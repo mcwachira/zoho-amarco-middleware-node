@@ -1,0 +1,6 @@
+﻿<Command Name="ReadLastAndTotalReceiptNum">
+  <Response ACK="false">
+    <Res Name="LastCUInvoiceNum" Value="" Type="Text" MaxLen="19" />
+    <Res Name="LastReceiptNum" Value="" Type="Decimal_with_format" MaxLen="7" Format="0000000" />
+  </Response>
+</Command>

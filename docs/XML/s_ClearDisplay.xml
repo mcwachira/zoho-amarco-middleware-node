@@ -1,0 +1,3 @@
+﻿<Command Name="ClearDisplay" CmdByte="0x24">
+  <FPOperation>Clears the external display.</FPOperation>
+</Command>

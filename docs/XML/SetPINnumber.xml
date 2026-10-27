@@ -1,0 +1,6 @@
+﻿<Command Name="SetPINnumber">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="PINnum" Value="" />
+  </Args>
+</Command>

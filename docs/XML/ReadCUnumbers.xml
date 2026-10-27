@@ -1,0 +1,6 @@
+﻿<Command Name="ReadCUnumbers">
+  <Response ACK="false">
+    <Res Name="SerialNumber" Value="" Type="Text" MaxLen="20" />
+    <Res Name="PINnumber" Value="" Type="Text" MaxLen="11" />
+  </Response>
+</Command>

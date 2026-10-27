@@ -1,0 +1,14 @@
+﻿<Command Name="ReadCUinvoiceNumber" CmdByte="0x5D">
+  <FPOperation>Request for original invoice number in case of open receipt rejection due to duplicate TRADER SYSTEM INVOICE NUMBER and response received.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['I']>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="CU_InvoiceNumber" Value="" Type="Text" MaxLen="19">
+      <Desc>19 symbols for CU Invoice number</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['I']><;> <CU_InvoiceNumber[19]>]]></ResFormatRaw>
+  </Response>
+</Command>

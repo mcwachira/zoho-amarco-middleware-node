@@ -1,0 +1,32 @@
+﻿<Command Name="Subtotal" CmdByte="0x33">
+  <FPOperation>Calculate the subtotal amount with printing and display visualization options. Provide information about values of the calculated amounts. If a percent or value discount/addition has been specified the subtotal and the discount/addition value will be printed regardless the parameter for printing.</FPOperation>
+  <Args>
+    <Arg Name="OptionPrinting" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionDisplay" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '1' - Yes 
+ - '0' - No</Desc>
+    </Arg>
+    <Arg Name="DiscAddV" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for the value of the 
+discount/addition. Use minus sign '-' for discount</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence=":" />
+    </Arg>
+    <Arg Name="DiscAddP" Value="" Type="Decimal" MaxLen="7">
+      <Desc>Up to 7 symbols for the percentage value of the 
+discount/addition. Use minus sign '-' for discount</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="," />
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <OptionPrinting['0']> <;> <OptionDisplay[1]> {<':'> <DiscAddV[1..13]>} {<','> <DiscAddP[1..7]>} ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="SubtotalValue" Value="" Type="Decimal" MaxLen="13">
+      <Desc>Up to 13 symbols for the value of the subtotal amount</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<SubtotalValue[1..13]>]]></ResFormatRaw>
+  </Response>
+</Command>

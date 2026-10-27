@@ -57,7 +57,6 @@ describe("Health endpoints", () => {
     expect(response.headers["x-powered-by"]).toBeUndefined();
   });
 
-
   it("reports connected when device diagnostics succeed", async () => {
     const fiscalDeviceDiagnostics = {
       checkConnection: vi.fn().mockResolvedValue({ status: "connected" }),
@@ -105,5 +104,4 @@ describe("Health endpoints", () => {
       component: "device",
     });
   });
-
 });

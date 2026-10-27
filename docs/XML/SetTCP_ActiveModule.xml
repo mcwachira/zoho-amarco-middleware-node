@@ -1,0 +1,10 @@
+﻿<Command Name="SetTCP_ActiveModule">
+  <Args>
+    <Arg Name="OptionUsedModule" Value="">
+      <Options>
+        <Option Name="LAN module" Value="1" />
+        <Option Name="WiFi module" Value="2" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

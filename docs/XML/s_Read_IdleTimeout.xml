@@ -1,0 +1,18 @@
+﻿<Command Name="Read_IdleTimeout" CmdByte="0x4E">
+  <FPOperation>Provides information about device's idle timeout. This timeout is seconds in which the connection will be closed when there is an inactivity. This information is available if the device has LAN or WiFi. Maximal value - 7200, minimal value 1. 0 is for never close the connection.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'Z'><;><'I'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="IdleTimeout" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>4 symbols for password in format ####</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'Z'><;><'I'><;><IdleTimeout[4]>]]></ResFormatRaw>
+  </Response>
+</Command>

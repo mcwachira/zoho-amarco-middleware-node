@@ -1,0 +1,12 @@
+﻿<Command Name="SetIdle_Timeout" CmdByte="0x4E">
+  <FPOperation>Program device's idle timeout setting. Set timeout for closing the connection if there is an inactivity. Maximal value - 7200, minimal value 1. 0 is for never close the connection. This option can be used only if the device has LAN or WiFi. To apply use - SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="IdleTimeout" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>4 symbols for Idle timeout in format ####</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'Z'><;><'I'><;><IdleTimeout[4]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

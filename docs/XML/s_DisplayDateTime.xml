@@ -1,0 +1,3 @@
+﻿<Command Name="DisplayDateTime" CmdByte="0x28">
+  <FPOperation>Shows the current date and time on the external display.</FPOperation>
+</Command>

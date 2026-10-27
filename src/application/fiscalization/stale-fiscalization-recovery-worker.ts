@@ -70,8 +70,8 @@ export function startStaleFiscalizationRecoveryWorker({
           "Stale fiscalization requests marked OutcomeUnknown; reconciliation is required",
         );
       }
-    } catch (error: unknown) {
-      logger.error({ err: error }, "Stale fiscalization recovery run failed");
+    } catch {
+      logger.error("Stale fiscalization recovery run failed");
     } finally {
       inFlight = undefined;
       scheduleNextRun();

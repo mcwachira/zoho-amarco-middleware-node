@@ -1,0 +1,17 @@
+﻿<Command Name="ReadEJByDateTime_JSON">
+  <Args>
+    <Arg Name="OptionReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="t" />
+        <Option Name="Detailed EJ" Value="T" />
+      </Options>
+    </Arg>
+    <Arg Name="StartRepFromDate" Value="" />
+    <Arg Name="EndRepFromDate" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10" />
+  </Response>
+</Command>

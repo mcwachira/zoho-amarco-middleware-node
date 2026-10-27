@@ -44,8 +44,8 @@ export function startZohoOAuthAttemptCleanup({
       if (deletedCount > 0) {
         logger.info({ deletedCount }, "Expired Zoho OAuth attempts cleaned up");
       }
-    } catch (error: unknown) {
-      logger.error({ err: error }, "Failed to clean up expired Zoho OAuth attempts");
+    } catch {
+      logger.error("Failed to clean up expired Zoho OAuth attempts");
     } finally {
       inFlight = undefined;
       scheduleNextRun();

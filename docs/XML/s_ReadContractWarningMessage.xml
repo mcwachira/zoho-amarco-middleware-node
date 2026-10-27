@@ -1,0 +1,20 @@
+﻿<Command Name="ReadContractWarningMessage" CmdByte="0x5A">
+  <FPOperation>Read the service contract warning message text.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="m" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['m']>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="m" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Line1" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 1</Desc>
+    </Res>
+    <Res Name="Line2" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 2</Desc>
+    </Res>
+    <Res Name="Line3" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 3</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['m']><;> <Line1[TextLength]> <;><Line2[TextLength]> <;> <Line3[TextLength]>]]></ResFormatRaw>
+  </Response>
+</Command>

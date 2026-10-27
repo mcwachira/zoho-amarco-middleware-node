@@ -1,0 +1,23 @@
+﻿<Command Name="ReadServiceContractExpiryDate" CmdByte="0x5A">
+  <FPOperation>Read the service contract expiry date</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['D']> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionActivation" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0'- No 
+ - '1'- Yes</Desc>
+    </Res>
+    <Res Name="ExpiryDate" Value="" Type="DateTime" MaxLen="10" Format="ddMMyyyy">
+      <Desc>8 symbols for date in the format 'DDMMYYYY'</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['D']><;><Activation[1]><;> <ExpiryDate "DDMMYYYY">]]></ResFormatRaw>
+  </Response>
+</Command>

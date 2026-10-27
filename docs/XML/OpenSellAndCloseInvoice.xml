@@ -1,0 +1,22 @@
+﻿<Command Name="OpenSellAndCloseInvoice">
+  <Args>
+    <Arg Name="ClientPINnum" Value="" />
+    <Arg Name="ExemptionNum" Value="" />
+    <Arg Name="TraderSystemInvNum" Value="" />
+    <Arg Name="NamePLU" Value="" />
+    <Arg Name="OptionVATClass" Value="">
+      <Options>
+        <Option Name="VAT Class A" Value="A" />
+      </Options>
+    </Arg>
+    <Arg Name="Price" Value="" />
+    <Arg Name="MeasureUnit" Value="" />
+    <Arg Name="HSCode" Value="" />
+    <Arg Name="Quantity" Value="" Compulsory="false" />
+    <Arg Name="DiscAddP" Value="" Compulsory="false" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="InvoiceNum" Value="" Type="Text" MaxLen="19" />
+    <Res Name="QRcode" Value="" Type="Text" MaxLen="128" />
+  </Response>
+</Command>

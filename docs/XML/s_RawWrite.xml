@@ -1,0 +1,8 @@
+﻿<Command Name="RawWrite" CmdByte="0xFE">
+  <FPOperation> Writes raw bytes to FP </FPOperation>
+  <Args>
+    <Arg Name="Bytes" Value="" Type="Base64" MaxLen="5000">
+      <Desc>The bytes in BASE64 ecoded string to be written to FP</Desc>
+    </Arg>
+  </Args>
+</Command>

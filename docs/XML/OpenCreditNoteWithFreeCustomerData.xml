@@ -1,0 +1,12 @@
+﻿<Command Name="OpenCreditNoteWithFreeCustomerData">
+  <Args>
+    <Arg Name="CompanyName" Value="" />
+    <Arg Name="ClientPINnum" Value="" />
+    <Arg Name="HeadQuarters" Value="" />
+    <Arg Name="Address" Value="" />
+    <Arg Name="PostalCodeAndCity" Value="" />
+    <Arg Name="ExemptionNum" Value="" />
+    <Arg Name="RelatedInvoiceNum" Value="" />
+    <Arg Name="TraderSystemInvNum" Value="" />
+  </Args>
+</Command>

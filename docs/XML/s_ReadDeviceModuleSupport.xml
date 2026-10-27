@@ -1,0 +1,54 @@
+﻿<Command Name="ReadDeviceModuleSupport" CmdByte="0x4E">
+  <FPOperation>FlagsModule is a char with bits representing modules supported by the device.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'D'><;><'D'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionLAN" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol for LAN suppor 
+- '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <Res Name="OptionWiFi" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol for WiFi support 
+- '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <Res Name="OptionGPRS" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol for GPRS support 
+- '0' - No 
+ - '1' - Yes 
+BT (Bluetooth) 1 symbol for Bluetooth support 
+- '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <Res Name="OptionBT" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>(Bluetooth) 1 symbol for Bluetooth support 
+- '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'D'><;><'D'><;><LAN[1]><;><WiFi>[1]><;><GPRS>[1]><;><BT[1]>]]></ResFormatRaw>
+  </Response>
+</Command>

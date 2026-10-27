@@ -1,0 +1,5 @@
+﻿<Command Name="ConfirmFiscalization">
+  <Args>
+    <Arg Name="Password" Value="" />
+  </Args>
+</Command>

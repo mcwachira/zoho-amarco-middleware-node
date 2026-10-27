@@ -1,0 +1,8 @@
+﻿<Command Name="ProgContractWarningMessages">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="Line1" Value="" />
+    <Arg Name="Line2" Value="" />
+    <Arg Name="Line3" Value="" />
+  </Args>
+</Command>

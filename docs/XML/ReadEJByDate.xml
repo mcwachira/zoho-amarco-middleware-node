@@ -1,0 +1,7 @@
+﻿<Command Name="ReadEJByDate">
+  <Args>
+    <Arg Name="StartRepFromDate" Value="" />
+    <Arg Name="EndRepFromDate" Value="" />
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

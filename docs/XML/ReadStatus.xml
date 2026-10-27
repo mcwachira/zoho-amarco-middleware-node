@@ -1,0 +1,70 @@
+﻿<Command Name="ReadStatus">
+  <Response ACK="false">
+    <Res Name="Power_down_in_opened_fiscal_receipt" Value="" Type="Status" Byte="0" Bit="1">
+      <Desc>Power down in opened fiscal receipt</Desc>
+    </Res>
+    <Res Name="DateTime_not_set" Value="" Type="Status" Byte="0" Bit="3">
+      <Desc>DateTime not set</Desc>
+    </Res>
+    <Res Name="DateTime_wrong" Value="" Type="Status" Byte="0" Bit="4">
+      <Desc>DateTime wrong</Desc>
+    </Res>
+    <Res Name="RAM_reset" Value="" Type="Status" Byte="0" Bit="5">
+      <Desc>RAM reset</Desc>
+    </Res>
+    <Res Name="Hardware_clock_error" Value="" Type="Status" Byte="0" Bit="6">
+      <Desc>Hardware clock error</Desc>
+    </Res>
+    <Res Name="Reports_registers_Overflow" Value="" Type="Status" Byte="1" Bit="1">
+      <Desc>Reports registers Overflow</Desc>
+    </Res>
+    <Res Name="Opened_Fiscal_Receipt" Value="" Type="Status" Byte="2" Bit="1">
+      <Desc>Opened Fiscal Receipt</Desc>
+    </Res>
+    <Res Name="Receipt_Invoice_Type" Value="" Type="Status" Byte="2" Bit="2">
+      <Desc>Receipt Invoice Type</Desc>
+    </Res>
+    <Res Name="SD_card_near_full" Value="" Type="Status" Byte="2" Bit="5">
+      <Desc>SD card near full</Desc>
+    </Res>
+    <Res Name="SD_card_full" Value="" Type="Status" Byte="2" Bit="6">
+      <Desc>SD card full</Desc>
+    </Res>
+    <Res Name="CU_fiscalized" Value="" Type="Status" Byte="3" Bit="5">
+      <Desc>CU fiscalized</Desc>
+    </Res>
+    <Res Name="CU_produced" Value="" Type="Status" Byte="3" Bit="6">
+      <Desc>CU produced</Desc>
+    </Res>
+    <Res Name="Paired_with_TIMS" Value="" Type="Status" Byte="4" Bit="0">
+      <Desc>Paired with TIMS</Desc>
+    </Res>
+    <Res Name="Unsent_receipts" Value="" Type="Status" Byte="4" Bit="1">
+      <Desc>Unsent receipts</Desc>
+    </Res>
+    <Res Name="Service_contract_nearly_expired" Value="" Type="Status" Byte="4" Bit="2">
+      <Desc>Service contract nearly expired</Desc>
+    </Res>
+    <Res Name="No_Sec_IC" Value="" Type="Status" Byte="5" Bit="0">
+      <Desc>No Sec.IC</Desc>
+    </Res>
+    <Res Name="No_certificates" Value="" Type="Status" Byte="5" Bit="1">
+      <Desc>No certificates</Desc>
+    </Res>
+    <Res Name="Service_jumper" Value="" Type="Status" Byte="5" Bit="2">
+      <Desc>Service jumper</Desc>
+    </Res>
+    <Res Name="Expired_service_contract" Value="" Type="Status" Byte="5" Bit="3">
+      <Desc>Expired service contract</Desc>
+    </Res>
+    <Res Name="Missing_SD_card" Value="" Type="Status" Byte="5" Bit="4">
+      <Desc>Missing SD card</Desc>
+    </Res>
+    <Res Name="Wrong_SD_card" Value="" Type="Status" Byte="5" Bit="5">
+      <Desc>Wrong SD card</Desc>
+    </Res>
+    <Res Name="Update_is_available" Value="" Type="Status" Byte="5" Bit="6">
+      <Desc>Update is available</Desc>
+    </Res>
+  </Response>
+</Command>

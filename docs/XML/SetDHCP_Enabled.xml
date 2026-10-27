@@ -1,0 +1,10 @@
+﻿<Command Name="SetDHCP_Enabled">
+  <Args>
+    <Arg Name="OptionDHCPEnabled" Value="">
+      <Options>
+        <Option Name="Disabled" Value="0" />
+        <Option Name="Enabled" Value="1" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

@@ -1,0 +1,7 @@
+﻿<Command Name="DailyReport" CmdByte="0x7C">
+  <FPOperation>Provides information for the daily fiscal report  with zeroing and fiscal memory record, preceded by Electronic Journal report.</FPOperation>
+  <Args>
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'Z'>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

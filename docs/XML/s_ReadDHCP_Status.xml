@@ -1,0 +1,24 @@
+﻿<Command Name="ReadDHCP_Status" CmdByte="0x4E">
+  <FPOperation>Provides information about device's DHCP status</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'T'><;><'1'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionDHCPEnabled" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Disabled" Value="0" />
+        <Option Name="Enabled" Value="1" />
+      </Options>
+      <Desc>(Status) 1 symbols for device's DHCP status 
+- '0' - Disabled 
+ - '1' - Enabled</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'T'><;><'1'><;><DHCPEnabled[1]>]]></ResFormatRaw>
+  </Response>
+</Command>

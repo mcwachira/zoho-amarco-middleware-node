@@ -1,0 +1,5 @@
+﻿<Command Name="SetDeviceTCP_MACAddress">
+  <Args>
+    <Arg Name="MACAddress" Value="" />
+  </Args>
+</Command>

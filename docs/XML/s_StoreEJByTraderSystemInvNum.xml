@@ -1,0 +1,28 @@
+﻿<Command Name="StoreEJByTraderSystemInvNum" CmdByte="0x7C">
+  <FPOperation>Store Electronic Journal Report by Trader System Invoice Number (Single Invoice) to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionReportStorage" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J4' - Storage in External SD card memory 
+ - 'JX' - Storage in External SD card memory for JSON</Desc>
+    </Arg>
+    <Arg Name="OptionTraderSystemReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+      <Desc>1 character with value 
+ - 'S' - Detailed EJ 
+ - 's' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for trader system invoice 
+number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[<OptionReportStorage[2]> <;> <TraderSystemReportFormat[1]> <;> <TraderSystemInvNum[15]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

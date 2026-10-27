@@ -1,0 +1,9 @@
+﻿<Command Name="ScanWiFiNetworks" CmdByte="0x4E">
+  <FPOperation>The device scan out the list of available WiFi networks.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="W" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'W'><;><'S'> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

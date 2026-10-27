@@ -1,0 +1,12 @@
+﻿<Command Name="ReadEJByPINofBuyer">
+  <Args>
+    <Arg Name="OptionPINReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="p" />
+        <Option Name="Detailed EJ" Value="P" />
+      </Options>
+    </Arg>
+    <Arg Name="PINnumber" Value="" />
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

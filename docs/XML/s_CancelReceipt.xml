@@ -1,0 +1,3 @@
+﻿<Command Name="CancelReceipt" CmdByte="0x39">
+  <FPOperation>Available only if the receipt is not closed. Cancel all sales in the receipt and close it .</FPOperation>
+</Command>

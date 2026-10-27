@@ -1,0 +1,10 @@
+﻿<Command Name="ConfirmFiscalization" CmdByte="0x41">
+  <FPOperation>Confirm PIN number.</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <Arg Name="" Value="2" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Password[6]> <;> <'2'>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

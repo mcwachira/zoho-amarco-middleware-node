@@ -1,0 +1,39 @@
+﻿<Command Name="ReadCurrentReceiptInfo">
+  <Response ACK="false">
+    <Res Name="OptionIsReceiptOpened" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Res>
+    <Res Name="SalesNumber" Value="" Type="Text" MaxLen="3" />
+    <Res Name="SubtotalAmountVATGA" Value="" Type="Decimal" MaxLen="13" />
+    <Res Name="SubtotalAmountVATGB" Value="" Type="Decimal" MaxLen="13" />
+    <Res Name="SubtotalAmountVATGC" Value="" Type="Decimal" MaxLen="13" />
+    <Res Name="SubtotalAmountVATGD" Value="" Type="Decimal" MaxLen="13" />
+    <Res Name="SubtotalAmountVATGE" Value="" Type="Decimal" MaxLen="13" />
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionReceiptFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief" Value="0" />
+        <Option Name="Detailed" Value="1" />
+      </Options>
+    </Res>
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionClientReceipt" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="invoice (client) receipt" Value="1" />
+        <Option Name="standard receipt" Value="0" />
+      </Options>
+    </Res>
+    <Res Name="OptionPowerDownInReceipt" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Res>
+    <Res Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+  </Response>
+</Command>

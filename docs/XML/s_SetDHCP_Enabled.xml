@@ -1,0 +1,18 @@
+﻿<Command Name="SetDHCP_Enabled" CmdByte="0x4E">
+  <FPOperation>Program device's TCP network DHCP enabled or disabled. To apply use -SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionDHCPEnabled" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Disabled" Value="0" />
+        <Option Name="Enabled" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0' - Disabled 
+ - '1' - Enabled</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'T'><;><'1'><;><DHCPEnabled[1]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

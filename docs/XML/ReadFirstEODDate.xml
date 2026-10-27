@@ -1,0 +1,8 @@
+﻿<Command Name="ReadFirstEODDate">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Option" Value="f" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="DateTime" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy" />
+  </Response>
+</Command>
