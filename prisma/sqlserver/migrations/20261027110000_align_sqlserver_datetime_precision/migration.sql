@@ -1,0 +1,30 @@
+ALTER TABLE [FiscalizationRecord]
+    ALTER COLUMN [issuedAt] DATETIME2 NULL;
+ALTER TABLE [FiscalizationRecord]
+    ALTER COLUMN [createdAt] DATETIME2 NOT NULL;
+ALTER TABLE [FiscalizationRecord]
+    ALTER COLUMN [updatedAt] DATETIME2 NOT NULL;
+
+ALTER TABLE [ZohoOAuthAttempt]
+    ALTER COLUMN [expiresAt] DATETIME2 NOT NULL;
+ALTER TABLE [ZohoOAuthAttempt]
+    ALTER COLUMN [consumedAt] DATETIME2 NULL;
+ALTER TABLE [ZohoOAuthAttempt]
+    ALTER COLUMN [createdAt] DATETIME2 NOT NULL;
+
+ALTER TABLE [ZohoToken]
+    ALTER COLUMN [accessTokenExpiresAt] DATETIME2 NOT NULL;
+ALTER TABLE [ZohoToken]
+    ALTER COLUMN [createdAt] DATETIME2 NOT NULL;
+ALTER TABLE [ZohoToken]
+    ALTER COLUMN [updatedAt] DATETIME2 NOT NULL;
+
+ALTER TABLE [FiscalCustomerProfile]
+    ALTER COLUMN [createdAt] DATETIME2 NOT NULL;
+ALTER TABLE [FiscalCustomerProfile]
+    ALTER COLUMN [updatedAt] DATETIME2 NOT NULL;
+
+ALTER TABLE [FiscalItemProfile]
+    ALTER COLUMN [createdAt] DATETIME2 NOT NULL;
+ALTER TABLE [FiscalItemProfile]
+    ALTER COLUMN [updatedAt] DATETIME2 NOT NULL;

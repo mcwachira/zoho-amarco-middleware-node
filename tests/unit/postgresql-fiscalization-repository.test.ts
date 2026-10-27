@@ -5,14 +5,43 @@ import { startFiscalization } from "../../src/domain/fiscalization/fiscalization
 import type { FiscalizationRecordRow } from "../../src/infrastructure/database/fiscalization-record-mapper.js";
 import { PostgresqlFiscalizationRepository } from "../../src/infrastructure/database/postgresql-fiscalization-repository.js";
 import { DuplicateZohoInvoiceError } from "../../src/application/fiscalization/fiscalization-errors.js";
+import { makeFiscalizationSnapshot } from "./fiscalization-snapshot-fixture.js";
+import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
 
 const now = new Date("2026-10-23T07:00:00.000Z");
+const invoice: FiscalInvoiceCandidate = {
+  zohoInvoiceId: "zoho-invoice-001",
+  invoiceNumber: "INV-001",
+  customerId: "customer-1",
+  customerName: "Example Customer",
+  currencyCode: "KES",
+  lines: [
+    {
+      sourceLineId: "line-1",
+      itemId: "item-1",
+      description: "Test product",
+      quantity: "1",
+      unitPrice: "10",
+      lineTotal: "10",
+      taxId: "tax-1",
+      taxName: "Source tax",
+      taxType: "tax",
+      taxPercentage: "16",
+    },
+  ],
+  subtotal: "10",
+  taxTotal: "1.6",
+  total: "11.6",
+};
+const snapshot = await makeFiscalizationSnapshot(invoice);
 
 function makeRow(overrides: Partial<FiscalizationRecordRow> = {}): FiscalizationRecordRow {
   return {
     id: "fiscalization-001",
     zohoInvoiceId: "zoho-invoice-001",
     status: "Pending",
+    snapshotVersion: null,
+    snapshotJson: null,
     receiptNumber: null,
     issuedAt: null,
     failureCode: null,
@@ -74,6 +103,7 @@ describe("PostgresqlFiscalizationRepository", () => {
     const record = createFiscalizationRecord({
       id: "fiscalization-001",
       zohoInvoiceId: "zoho-invoice-001",
+      snapshot,
     });
 
     await repository.create(record);
@@ -82,6 +112,8 @@ describe("PostgresqlFiscalizationRepository", () => {
       data: expect.objectContaining({
         id: "fiscalization-001",
         zohoInvoiceId: "zoho-invoice-001",
+        snapshotVersion: snapshot.schemaVersion,
+        snapshotJson: JSON.stringify(snapshot),
         status: "Pending",
         receiptNumber: null,
       }),
@@ -158,6 +190,10 @@ describe("PostgresqlFiscalizationRepository", () => {
       }),
     });
 
+    const updateData = prismaMock.fiscalizationRecord.updateMany.mock.calls[0]?.[0].data;
+    expect(updateData).not.toHaveProperty("snapshotVersion");
+    expect(updateData).not.toHaveProperty("snapshotJson");
+
     expect(result).toBe(true);
   });
 
@@ -183,6 +219,7 @@ describe("PostgresqlFiscalizationRepository", () => {
     const record = createFiscalizationRecord({
       id: "fiscalization-001",
       zohoInvoiceId: "zoho-invoice-001",
+      snapshot,
     });
 
     prismaMock.fiscalizationRecord.create.mockRejectedValue({
@@ -195,6 +232,10 @@ describe("PostgresqlFiscalizationRepository", () => {
     await expect(repository.create(record)).rejects.toBeInstanceOf(DuplicateZohoInvoiceError);
 
     expect(prismaMock.fiscalizationRecord.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.fiscalizationRecord.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ snapshotJson: JSON.stringify(snapshot) }),
+    });
+    expect(prismaMock.fiscalizationRecord.updateMany).not.toHaveBeenCalled();
   });
 
   it("preserves unrelated unique constraint errors", async () => {
