@@ -1,0 +1,17 @@
+﻿<Command Name="StoreEJByTraderSystemInvNum">
+  <Args>
+    <Arg Name="OptionReportStorage" Value="">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+    </Arg>
+    <Arg Name="OptionTraderSystemReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" />
+  </Args>
+</Command>

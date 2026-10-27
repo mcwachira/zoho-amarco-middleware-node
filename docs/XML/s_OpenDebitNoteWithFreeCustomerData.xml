@@ -1,0 +1,35 @@
+﻿<Command Name="OpenDebitNoteWithFreeCustomerData" CmdByte="0x30">
+  <FPOperation>Opens a fiscal invoice debit note receipt assigned to the specified operator number and operator password with free info for customer data. The Invoice receipt can be issued only if the invoice range (start and end numbers) is set.</FPOperation>
+  <Args>
+    <Arg Name="reserved" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="reserved" Value="     0" Type="OptionHardcoded" MaxLen="6" />
+    <Arg Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="InvoiceDebitNoteType" Value="@" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="CompanyName" Value="" Type="Text" MaxLen="30">
+      <Desc>30 symbols for Invoice company name</Desc>
+    </Arg>
+    <Arg Name="ClientPINnum" Value="" Type="Text" MaxLen="14">
+      <Desc>14 symbols for client PIN number</Desc>
+    </Arg>
+    <Arg Name="HeadQuarters" Value="" Type="Text" MaxLen="30">
+      <Desc>30 symbols for customer headquarters</Desc>
+    </Arg>
+    <Arg Name="Address" Value="" Type="Text" MaxLen="30">
+      <Desc>30 symbols for Address</Desc>
+    </Arg>
+    <Arg Name="PostalCodeAndCity" Value="" Type="Text" MaxLen="30">
+      <Desc>30 symbols for postal code and city</Desc>
+    </Arg>
+    <Arg Name="ExemptionNum" Value="" Type="Text" MaxLen="30">
+      <Desc>30 symbols for exemption number</Desc>
+    </Arg>
+    <Arg Name="RelatedInvoiceNum" Value="" Type="Text" MaxLen="19">
+      <Desc>19 symbols for the related invoice number in format 
+###################</Desc>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for trader system invoice number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <reserved['1']> <;> <reserved['     0']> <;> <reserved['0']> <;> <InvoiceDebitNoteType['@']> <;> <CompanyName[30]> <;> <ClientPINnum[14]> <;> <HeadQuarters[30]> <;> <Address[30]> <;> <PostalCodeAndCity[30]> <;> <ExemptionNum[30]> <;> <RelatedInvoiceNum[19]><;><TraderSystemInvNum[15]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

@@ -1,0 +1,9 @@
+﻿<Command Name="ReadContractWarningMessage">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="m" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Line1" Value="" Type="Text" MaxLen="64" />
+    <Res Name="Line2" Value="" Type="Text" MaxLen="64" />
+    <Res Name="Line3" Value="" Type="Text" MaxLen="64" />
+  </Response>
+</Command>

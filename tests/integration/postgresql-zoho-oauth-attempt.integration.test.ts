@@ -89,4 +89,21 @@ integrationDescribe("PostgreSQL Zoho OAuth attempt repository (integration)", ()
 
     expect(storedAttempt?.consumedAt).not.toBeNull();
   });
+
+  it("enforces unique OAuth state hashes", async () => {
+    const stateHash = randomBytes(32).toString("hex");
+    const encryptedCodeVerifier = `integration-test-${randomUUID()}`;
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    testStateHashes.push(stateHash);
+
+    await repository.create({ stateHash, encryptedCodeVerifier, expiresAt });
+
+    await expect(
+      repository.create({
+        stateHash,
+        encryptedCodeVerifier: `duplicate-${randomUUID()}`,
+        expiresAt,
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+  });
 });

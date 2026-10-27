@@ -42,6 +42,14 @@ export class SqlServerFiscalizationRepository implements FiscalizationRepository
     return row === null ? null : toDomainRecord(row);
   }
 
+  async findByZohoInvoiceId(zohoInvoiceId: string): Promise<FiscalizationRecord | null> {
+    const row = await this.prisma.fiscalizationRecord.findUnique({
+      where: { zohoInvoiceId },
+    });
+
+    return row === null ? null : toDomainRecord(row);
+  }
+
   async create(record: FiscalizationRecord): Promise<void> {
     try {
       await this.prisma.fiscalizationRecord.create({

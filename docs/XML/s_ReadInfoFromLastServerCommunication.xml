@@ -1,0 +1,62 @@
+﻿<Command Name="ReadInfoFromLastServerCommunication" CmdByte="0x5A">
+  <FPOperation>Provide information from the last communication with the server.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionServerResponse" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="At send EOD" Value="Z" />
+        <Option Name="At send receipt" Value="R" />
+      </Options>
+      <Desc>1 symbol with value 
+- 'R' - At send receipt 
+- 'Z' - At send EOD</Desc>
+    </Arg>
+    <Arg Name="OptionTransactionType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Error Code" Value="c" />
+        <Option Name="Error Message" Value="m" />
+        <Option Name="Exception Message" Value="e" />
+        <Option Name="Response Code" Value="r" />
+        <Option Name="Status" Value="s" />
+      </Options>
+      <Desc>1 symbol with value 
+- 'c' - Error Code 
+- 'm' - Error Message 
+- 's' - Status 
+- 'e' - Exception Message 
+- 'r' - Response Code</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['S']><;> <ServerResponse[1]><;><TransactionType[1]> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionServerResponse" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="At send EOD" Value="Z" />
+        <Option Name="At send receipt" Value="R" />
+      </Options>
+      <Desc>1 symbol with value 
+- 'R' - At send receipt 
+- 'Z' - At send EOD</Desc>
+    </Res>
+    <Res Name="OptionTransactionType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Error Code" Value="c" />
+        <Option Name="Error Message" Value="m" />
+        <Option Name="Exception Message" Value="e" />
+        <Option Name="Response Code" Value="r" />
+        <Option Name="Status" Value="s" />
+      </Options>
+      <Desc>1 symbol with value 
+- 'c' - Error Code 
+- 'm' - Error Message 
+- 's' - Status 
+- 'e' - Exception Message 
+- 'r' - Response Code</Desc>
+    </Res>
+    <Res Name="Message" Value="" Type="Text" MaxLen="200">
+      <Desc>Up to 200 symbols for the message from the server</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['S']><;> <ServerResponse[1]><;><TransactionType[1]><;><Message[200]>]]></ResFormatRaw>
+  </Response>
+</Command>

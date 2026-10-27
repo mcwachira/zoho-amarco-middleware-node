@@ -1,0 +1,13 @@
+﻿<Command Name="ReadEJByDateTime">
+  <Args>
+    <Arg Name="OptionReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="t" />
+        <Option Name="Detailed EJ" Value="T" />
+      </Options>
+    </Arg>
+    <Arg Name="StartRepFromDate" Value="" />
+    <Arg Name="EndRepFromDate" Value="" />
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

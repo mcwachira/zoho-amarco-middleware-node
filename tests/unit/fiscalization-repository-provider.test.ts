@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PostgresqlFiscalCustomerProfileRepository } from "../../src/infrastructure/database/postgresql-fiscal-customer-profile-repository.js";
+import { PostgresqlFiscalItemProfileRepository } from "../../src/infrastructure/database/postgresql-fiscal-item-profile-repository.js";
+import { SqlServerFiscalCustomerProfileRepository } from "../../src/infrastructure/database/sqlserver-fiscal-customer-profile-repository.js";
+import { SqlServerFiscalItemProfileRepository } from "../../src/infrastructure/database/sqlserver-fiscal-item-profile-repository.js";
+import { PostgresqlEtimsReportingRepository } from "../../src/infrastructure/database/postgresql-etims-reporting-repository.js";
+import { SqlServerEtimsReportingRepository } from "../../src/infrastructure/database/sqlserver-etims-reporting-repository.js";
 
 // Hoist mocks so they are available when the provider's imports are evaluated.
 const mocks = vi.hoisted(() => {
@@ -135,6 +141,13 @@ describe("createFiscalizationRepositoryProvider", () => {
     expect(provider.zohoTokenRepository).toEqual({
       kind: "postgresql-zoho-token",
     });
+    expect(provider.fiscalCustomerProfileRepository).toBeInstanceOf(
+      PostgresqlFiscalCustomerProfileRepository,
+    );
+    expect(provider.fiscalItemProfileRepository).toBeInstanceOf(
+      PostgresqlFiscalItemProfileRepository,
+    );
+    expect(provider.etimsReportingRepository).toBeInstanceOf(PostgresqlEtimsReportingRepository);
 
     mocks.client.$queryRaw.mockResolvedValueOnce([{ "?column?": 1 }]);
     await provider.checkConnection();
@@ -177,6 +190,13 @@ describe("createFiscalizationRepositoryProvider", () => {
     expect(provider.zohoTokenRepository).toEqual({
       kind: "sqlserver-zoho-token",
     });
+    expect(provider.fiscalCustomerProfileRepository).toBeInstanceOf(
+      SqlServerFiscalCustomerProfileRepository,
+    );
+    expect(provider.fiscalItemProfileRepository).toBeInstanceOf(
+      SqlServerFiscalItemProfileRepository,
+    );
+    expect(provider.etimsReportingRepository).toBeInstanceOf(SqlServerEtimsReportingRepository);
 
     mocks.client.$queryRaw.mockResolvedValueOnce([{ "?column?": 1 }]);
     await provider.checkConnection();
@@ -204,6 +224,19 @@ describe("createFiscalizationRepositoryProvider", () => {
     expect(() => createFiscalizationRepositoryProvider()).toThrow(
       "SQL Server connection settings are incomplete",
     );
+    expect(mocks.createSqlServerClient).not.toHaveBeenCalled();
+  });
+
+  it("fails clearly for an unsupported provider value", () => {
+    Object.defineProperty(mocks.env, "DATABASE_PROVIDER", {
+      configurable: true,
+      value: "unsupported",
+    });
+
+    expect(() => createFiscalizationRepositoryProvider()).toThrow(
+      "Unsupported DATABASE_PROVIDER value.",
+    );
+    expect(mocks.createPostgresqlClient).not.toHaveBeenCalled();
     expect(mocks.createSqlServerClient).not.toHaveBeenCalled();
   });
 });

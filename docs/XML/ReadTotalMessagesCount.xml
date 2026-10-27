@@ -1,0 +1,9 @@
+﻿<Command Name="ReadTotalMessagesCount">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="L" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Count" Value="" Type="Text" MaxLen="3" />
+  </Response>
+</Command>

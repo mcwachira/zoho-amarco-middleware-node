@@ -1,0 +1,35 @@
+﻿<Command Name="ReadEODAmountsByDate" CmdByte="0x6D">
+  <FPOperation>Provides information about the accumulated EOD turnover and VAT amounts by date</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="EOD_Date" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>6 symbols for initial date in the DDMMYY format</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['d']> <;> <EOD_Date "DDMMYY"> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="EOD_Date" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>6 symbols for initial date in the DDMMYY format</Desc>
+    </Res>
+    <Res Name="EOD_sale_turnover" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD sale turnover</Desc>
+    </Res>
+    <Res Name="EOD_credit_turnover" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD credit turnover</Desc>
+    </Res>
+    <Res Name="EOD_saleVAT" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD VAT from sales</Desc>
+    </Res>
+    <Res Name="EOD_creditVAT" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD VAT from credit invoices</Desc>
+    </Res>
+    <Res Name="InvoiceCount" Value="" Type="Text" MaxLen="4">
+      <Desc>4 symbols for invoices count</Desc>
+    </Res>
+    <Res Name="CreditCount" Value="" Type="Text" MaxLen="4">
+      <Desc>4 symbols for credit count</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['d']> <;> <EOD_Date "DDMMYY"> <;> <EOD_sale_turnover[1..20]> <;> <EOD_credit_turnover[1..20]> <;> <EOD_saleVAT[1..20]> <;> <EOD_creditVAT [1..20]> <;> <InvoiceCount[4]> <;> <CreditCount[4]>]]></ResFormatRaw>
+  </Response>
+</Command>

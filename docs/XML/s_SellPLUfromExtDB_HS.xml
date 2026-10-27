@@ -1,0 +1,27 @@
+﻿<Command Name="SellPLUfromExtDB_HS" CmdByte="0x31">
+  <FPOperation>Register the sell (for correction use minus sign in the price field) of article with specified name, price, quantity, VAT class and/or discount/addition on the transaction.</FPOperation>
+  <Args>
+    <Arg Name="NamePLU" Value="" Type="Text" MaxLen="36">
+      <Desc>36 symbols for article's name</Desc>
+    </Arg>
+    <Arg Name="reserved" Value=" " Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Price" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for article's price with upto 5 digits after decimal point</Desc>
+    </Arg>
+    <Arg Name="reserved" Value="   " Type="OptionHardcoded" MaxLen="3" />
+    <Arg Name="HSCode" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for HS Code in format XXXX.XX.XX</Desc>
+    </Arg>
+    <Arg Name="reserved" Value="                    " Type="OptionHardcoded" MaxLen="20" />
+    <Arg Name="reserved" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Quantity" Value="" Type="Decimal" MaxLen="10">
+      <Desc>1 to 10 symbols for quantity</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="*" />
+    </Arg>
+    <Arg Name="DiscAddP" Value="" Type="Decimal" MaxLen="7">
+      <Desc>1 to 7 for percentage of discount/addition</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="," />
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <NamePLU[36]> <;> <reserved[' ']> <;> <Price[1..15]> <;> <reserved['   ']> <;><HSCode[10]> <;> <reserved['                    ']> <;> <reserved['0']>  {<'*'> <Quantity[1..10]>} {<','> <DiscAddP[1..7]>}  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

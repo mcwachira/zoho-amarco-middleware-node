@@ -15,6 +15,11 @@ export interface FiscalizationRepository {
   findById(id: string): Promise<FiscalizationRecord | null>;
 
   /**
+   * Finds the existing record for a Zoho invoice, if one has been registered.
+   */
+  findByZohoInvoiceId(zohoInvoiceId: string): Promise<FiscalizationRecord | null>;
+
+  /**
    * Creates a new Pending record.
    *
    * The database implementation must enforce uniqueness for the Zoho invoice

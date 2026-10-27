@@ -1,0 +1,10 @@
+﻿<Command Name="SetServer_UsedComModule">
+  <Args>
+    <Arg Name="OptionModule" Value="">
+      <Options>
+        <Option Name="GSM" Value="0" />
+        <Option Name="LAN/WiFi" Value="1" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

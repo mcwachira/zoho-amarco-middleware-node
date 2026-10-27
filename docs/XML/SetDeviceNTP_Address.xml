@@ -1,0 +1,6 @@
+﻿<Command Name="SetDeviceNTP_Address">
+  <Args>
+    <Arg Name="AddressLen" Value="" />
+    <Arg Name="NTPAddress" Value="" />
+  </Args>
+</Command>

@@ -103,6 +103,65 @@ describe("mapZohoInvoice", () => {
     expect(result.candidate.taxTotal).toBe("0.00");
   });
 
+  it("does not infer receipt payment data from invoice totals or generic paid fields", () => {
+    const result = mapZohoInvoice(
+      createInvoice({
+        status: "paid",
+        payment_mode: "cash",
+        amount_paid: 348,
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected a valid invoice candidate.");
+    }
+
+    expect(result.candidate.total).toBe("348");
+    expect(result.candidate).not.toHaveProperty("payment");
+    expect(result.candidate).not.toHaveProperty("paymentStatus");
+    expect(result.candidate).not.toHaveProperty("paymentMethod");
+  });
+
+  it("rejects currency metadata that differs from the invoice source", () => {
+    const result = mapZohoInvoice(
+      createInvoice({
+        currency_code: "USD",
+      }),
+    );
+
+    expect(result).toEqual({
+      success: false,
+      errors: [
+        {
+          field: "currency_code",
+          message:
+            "The currency code from retrieved invoice metadata does not match the invoice source currency code.",
+        },
+      ],
+    });
+  });
+
+  it("rejects missing top-level currency metadata", () => {
+    const invoice = createInvoice();
+
+    const result = mapZohoInvoice({
+      ...invoice,
+      currencyCode: null,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      errors: [
+        {
+          field: "currency_code",
+          message:
+            "The currency code from retrieved invoice metadata does not match the invoice source currency code.",
+        },
+      ],
+    });
+  });
+
   it.each([
     ["missing currency", { currency_code: "" }],
     ["missing line items", { line_items: [] }],

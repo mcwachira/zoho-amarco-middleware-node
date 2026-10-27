@@ -2,7 +2,7 @@ import type {
   FiscalizationFailure,
   FiscalReceipt,
 } from "../../domain/fiscalization/fiscalization-record.js";
-import type { FiscalInvoiceCandidate } from "../zoho/zoho-invoice-mapper.js";
+import type { FiscalizationSnapshot } from "../../domain/fiscalization/fiscalization-snapshot.js";
 
 /**
  * The outcome reported by the fiscal-device adapter.
@@ -33,8 +33,8 @@ export type FiscalDeviceResult =
 /**
  * Contract for communicating with a fiscal device.
  *
- * The application passes a validated invoice candidate rather than
- * making the device adapter fetch invoice data itself.
+ * The application passes the immutable validated snapshot rather than
+ * making the adapter fetch invoice or profile data itself.
  *
  * Implementations must use only verified device commands and must
  * never blindly retry an operation whose outcome is uncertain.
@@ -46,5 +46,5 @@ export interface FiscalDevice {
    * The candidate contains mapped invoice data. It must not be treated
    * as proof that the invoice satisfies all Kenyan fiscal requirements.
    */
-  issueReceipt(invoice: FiscalInvoiceCandidate): Promise<FiscalDeviceResult>;
+  issueReceipt(snapshot: FiscalizationSnapshot): Promise<FiscalDeviceResult>;
 }

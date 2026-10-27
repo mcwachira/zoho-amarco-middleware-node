@@ -1,0 +1,9 @@
+﻿<Command Name="ReadEJ" CmdByte="0x7C">
+  <FPOperation>Read whole Electronic Journal report from beginning to the end.</FPOperation>
+  <Args>
+    <Arg Name="" Value="J0" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="" Value="*" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'J0'> <;> <'*'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

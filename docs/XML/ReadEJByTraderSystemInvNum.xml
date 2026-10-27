@@ -1,0 +1,12 @@
+﻿<Command Name="ReadEJByTraderSystemInvNum">
+  <Args>
+    <Arg Name="OptionTraderSystemReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" />
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

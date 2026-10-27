@@ -1,0 +1,16 @@
+﻿<Command Name="ReadGPRS_AuthenticationType">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionAuthenticationType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="CHAP" Value="2" />
+        <Option Name="None" Value="0" />
+        <Option Name="PAP" Value="1" />
+        <Option Name="PAP or CHAP" Value="3" />
+      </Options>
+    </Res>
+  </Response>
+</Command>

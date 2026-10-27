@@ -1,0 +1,38 @@
+﻿<Command Name="ReadInfoFromLastServerCommunication">
+  <Args>
+    <Arg Name="OptionServerResponse" Value="">
+      <Options>
+        <Option Name="At send EOD" Value="Z" />
+        <Option Name="At send receipt" Value="R" />
+      </Options>
+    </Arg>
+    <Arg Name="OptionTransactionType" Value="">
+      <Options>
+        <Option Name="Error Code" Value="c" />
+        <Option Name="Error Message" Value="m" />
+        <Option Name="Exception Message" Value="e" />
+        <Option Name="Response Code" Value="r" />
+        <Option Name="Status" Value="s" />
+      </Options>
+    </Arg>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionServerResponse" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="At send EOD" Value="Z" />
+        <Option Name="At send receipt" Value="R" />
+      </Options>
+    </Res>
+    <Res Name="OptionTransactionType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Error Code" Value="c" />
+        <Option Name="Error Message" Value="m" />
+        <Option Name="Exception Message" Value="e" />
+        <Option Name="Response Code" Value="r" />
+        <Option Name="Status" Value="s" />
+      </Options>
+    </Res>
+    <Res Name="Message" Value="" Type="Text" MaxLen="200" />
+  </Response>
+</Command>

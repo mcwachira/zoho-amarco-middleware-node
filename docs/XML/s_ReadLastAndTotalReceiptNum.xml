@@ -1,0 +1,13 @@
+﻿<Command Name="ReadLastAndTotalReceiptNum" CmdByte="0x71">
+  <FPOperation>Provides information about the number of the last issued receipt.</FPOperation>
+  <Response ACK="false">
+    <Res Name="LastCUInvoiceNum" Value="" Type="Text" MaxLen="19">
+      <Desc>19 symbols for the last number of invoice according the middleware, CU, 
+internal invoice counter</Desc>
+    </Res>
+    <Res Name="LastReceiptNum" Value="" Type="Decimal_with_format" MaxLen="7" Format="0000000">
+      <Desc>7 symbols for last receipt number in format #######</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<LastCUInvoiceNum[19]> <;> <LastReceiptNum[7]>]]></ResFormatRaw>
+  </Response>
+</Command>

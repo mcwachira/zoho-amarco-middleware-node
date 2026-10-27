@@ -1,0 +1,30 @@
+﻿<Command Name="StoreEJByCUInvoiceNum" CmdByte="0x7C">
+  <FPOperation>Store Electronic Journal Report by CU Invoice Number (Multiple invoices) to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionReportStorage" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J4' - Storage in External SD card memory 
+ - 'JX' - Storage in External SD card memory for JSON</Desc>
+    </Arg>
+    <Arg Name="OptionInvoiceReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="n" />
+        <Option Name="Detailed EJ" Value="N" />
+      </Options>
+      <Desc>1 character with value 
+ - 'N' - Detailed EJ 
+ - 'n' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="StartCUInvoiceNum" Value="" Type="Decimal_with_format" MaxLen="10" Format="0000000000.">
+      <Desc>10 symbols for start CU invoice number in format: ##########.</Desc>
+    </Arg>
+    <Arg Name="EndCUInvoiceNum" Value="" Type="Decimal_with_format" MaxLen="10" Format="0000000000.">
+      <Desc>10 symbols for end CU invoice number in format: ##########.</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[<OptionReportStorage[2]> <;> <InvoiceReportFormat[1]> <;> <StartCUInvoiceNum[10]> <;> <EndCUInvoiceNum[10]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

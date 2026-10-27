@@ -4,37 +4,40 @@ import {
   TremolHttpError,
   TremolProtocolError,
   TremolZfpLabServerClient,
+  parseTremolCloseReceiptMetadata,
+  parseTremolStatusFlags,
+  parseTremolVersion,
 } from "../../src/infrastructure/device/tremol-zfplabserver-client.js";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 describe("TremolZfpLabServerClient", () => {
-
-
   it("rejects a URL that does not use HTTP or HTTPS", () => {
     expect(
-        () =>
-            new TremolZfpLabServerClient({
-              baseUrl: "ftp://localhost:4444",
-            }),
+      () =>
+        new TremolZfpLabServerClient({
+          baseUrl: "ftp://localhost:4444",
+        }),
     ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
   });
 
   it("rejects URLs containing credentials", () => {
     expect(
-        () =>
-            new TremolZfpLabServerClient({
-              baseUrl: "http://user:password@localhost:4444",
-            }),
+      () =>
+        new TremolZfpLabServerClient({
+          baseUrl: "http://user:password@localhost:4444",
+        }),
     ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
   });
 
   it("rejects a zero or negative timeout", () => {
     for (const timeoutMs of [0, -1]) {
       expect(
-          () =>
-              new TremolZfpLabServerClient({
-                baseUrl: "http://localhost:4444",
-                timeoutMs,
-              }),
+        () =>
+          new TremolZfpLabServerClient({
+            baseUrl: "http://localhost:4444",
+            timeoutMs,
+          }),
       ).toThrow("timeoutMs must be a positive integer.");
     }
   });
@@ -96,7 +99,7 @@ describe("TremolZfpLabServerClient", () => {
     });
   });
 
-  it("accepts a documented successful XML response", async () => {
+  it("accepts the XML response shape expected by the local parser", async () => {
     const responseBody = '<Res Code="0"><Res Name="Example" Value="123" Type="String"/></Res>';
 
     const fetchImpl = vi
@@ -113,6 +116,35 @@ describe("TremolZfpLabServerClient", () => {
     expect(result.status).toBe(200);
     expect(result.resultCode).toBe(0);
     expect(result.body).toBe(responseBody);
+  });
+
+  it("parses the documented ReadVersion result field", async () => {
+    const body = '<Res Code="0"><Res Name="Version" Value="G03.1" Type="Text"/></Res>';
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { status: 200 }));
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    await expect(client.readVersion()).resolves.toMatchObject({
+      version: "G03.1",
+      response: { resultCode: 0, body },
+    });
+  });
+
+  it("rejects missing, duplicate, or invalid ReadVersion values", () => {
+    expect(() => parseTremolVersion('<Res Code="0"></Res>')).toThrow(TremolProtocolError);
+    expect(() =>
+      parseTremolVersion(
+        '<Res Code="0"><Res Name="Version" Value="1"/><Res Name="Version" Value="2"/></Res>',
+      ),
+    ).toThrow(TremolProtocolError);
+    expect(() => parseTremolVersion('<Res Code="0"><Res Name="Version" Value=""/></Res>')).toThrow(
+      TremolProtocolError,
+    );
+    expect(() =>
+      parseTremolVersion(`<Res Code="0"><Res Name="Version" Value="${"x".repeat(31)}"/></Res>`),
+    ).toThrow(TremolProtocolError);
   });
 
   it("rejects a nonzero Tremol result code even when HTTP succeeds", async () => {
@@ -164,7 +196,7 @@ describe("TremolZfpLabServerClient", () => {
     }
   });
 
-  it("rejects a response without the documented result envelope", async () => {
+  it("rejects a response without the XML result envelope expected by the parser", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response("not XML", { status: 200 }));
@@ -275,5 +307,108 @@ describe("TremolZfpLabServerClient", () => {
 
     expect(result.resultCode).toBe(0);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps ReadStatus flags and readiness unknown without a documented XML mapping", async () => {
+    const body =
+      '<Res Code="0">' +
+      '<Res Name="ST0" Value="218" Type="Decimal"/>' +
+      '<Res Name="ST1" Value="130" Type="Decimal"/>' +
+      '<Res Name="ST2" Value="230" Type="Decimal"/>' +
+      '<Res Name="ST3" Value="224" Type="Decimal"/>' +
+      '<Res Name="ST4" Value="135" Type="Decimal"/>' +
+      '<Res Name="ST5" Value="255" Type="Decimal"/>' +
+      '<Res Name="Power_down_in_opened_fiscal_receipt" Value="true" Type="Boolean"/>' +
+      "</Res>";
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { status: 200 }));
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    const result = await client.readStatus();
+
+    expect(result.response.status).toBe(200);
+    expect(result.flags).toMatchObject({
+      readiness: "unknown",
+      powerDownInOpenedFiscalReceipt: null,
+      dateTimeNotSet: null,
+      dateTimeWrong: null,
+      ramReset: null,
+      hardwareClockError: null,
+      registersOverflow: null,
+      fiscalReceiptOpened: null,
+      receiptInvoiceType: null,
+      sdCardNearFull: null,
+      sdCardFull: null,
+      cuFiscalized: null,
+      cuProduced: null,
+      pairedWithTims: null,
+      unsentReceipts: null,
+      serviceContractNearlyExpired: null,
+      noSecurityIc: null,
+      noCertificates: null,
+      serviceJumper: null,
+      expiredServiceContract: null,
+      missingSdCard: null,
+      wrongSdCard: null,
+      updateAvailable: null,
+    });
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toBe("http://localhost:4444/ReadStatus()");
+  });
+
+  it("keeps status values unknown when the server omits its unverified mapping", () => {
+    const flags = parseTremolStatusFlags('<Res Code="0"></Res>');
+
+    expect(flags.readiness).toBe("unknown");
+    expect(flags.fiscalReceiptOpened).toBeNull();
+    expect(flags.dateTimeNotSet).toBeNull();
+  });
+
+  it("rejects malformed or failed ReadStatus envelopes", () => {
+    expect(() => parseTremolStatusFlags("<Res")).toThrow(TremolProtocolError);
+    expect(() =>
+      parseTremolStatusFlags('<Res Code="40"><Err Type="FPException" STE1="30" STE2="34"/></Res>'),
+    ).toThrow(TremolDeviceError);
+  });
+
+  it("parses documented close metadata from a synthetic generic XML response", async () => {
+    const fixtureUrl = new URL("../fixtures/tremol-close-receipt-response.xml", import.meta.url);
+    const body = await readFile(fileURLToPath(fixtureUrl), "utf8");
+
+    expect(parseTremolCloseReceiptMetadata(body)).toEqual({
+      invoiceNumber: "CU202500000000001",
+      qrCode: "SYNTHETIC-QR-PAYLOAD",
+    });
+  });
+
+  it.each([
+    ["malformed XML", "<Res"],
+    ["missing the invoice number", '<Res Code="0"><Res Name="QRcode" Value="qr"/></Res>'],
+    ["missing the QR value", '<Res Code="0"><Res Name="InvoiceNum" Value="1"/></Res>'],
+    [
+      "duplicate invoice numbers",
+      '<Res Code="0"><Res Name="InvoiceNum" Value="1"/><Res Name="InvoiceNum" Value="2"/><Res Name="QRcode" Value="qr"/></Res>',
+    ],
+    [
+      "an empty invoice number",
+      '<Res Code="0"><Res Name="InvoiceNum" Value=""/><Res Name="QRcode" Value="qr"/></Res>',
+    ],
+    [
+      "an overlong invoice number",
+      `<Res Code="0"><Res Name="InvoiceNum" Value="${"1".repeat(20)}"/><Res Name="QRcode" Value="qr"/></Res>`,
+    ],
+    [
+      "an overlong QR value",
+      `<Res Code="0"><Res Name="InvoiceNum" Value="1"/><Res Name="QRcode" Value="${"q".repeat(129)}"/></Res>`,
+    ],
+  ])("rejects close metadata when response is %s", (_description, body) => {
+    expect(() => parseTremolCloseReceiptMetadata(body)).toThrow(TremolProtocolError);
+  });
+
+  it("distinguishes device error responses while parsing close metadata", () => {
+    expect(() =>
+      parseTremolCloseReceiptMetadata('<Res Code="40"><Err Type="FPException"/></Res>'),
+    ).toThrow(TremolDeviceError);
   });
 });

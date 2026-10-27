@@ -1,0 +1,9 @@
+﻿<Command Name="ReadVersion" CmdByte="0x21">
+  <FPOperation>Provides information about the device version.</FPOperation>
+  <Response ACK="false">
+    <Res Name="Version" Value="" Type="Text" MaxLen="30">
+      <Desc>Up to 30 symbols for Version name and Check sum</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Version[30]>]]></ResFormatRaw>
+  </Response>
+</Command>

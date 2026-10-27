@@ -1,0 +1,24 @@
+﻿<Command Name="ReadTCP_AutoStartStatus" CmdByte="0x4E">
+  <FPOperation>Provides information about if the TCP connection autostart when the device enter in Line/Sale mode.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="2" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'Z'><;><'2'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="2" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionTCPAutoStart" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+      <Desc>1 symbol for TCP auto start option 
+- '0' - No 
+ - '1' - Yes</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'Z'><;><'2'><;><TCPAutoStart[1]>]]></ResFormatRaw>
+  </Response>
+</Command>

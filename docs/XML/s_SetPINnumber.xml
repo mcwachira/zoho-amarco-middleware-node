@@ -1,0 +1,13 @@
+﻿<Command Name="SetPINnumber" CmdByte="0x41">
+  <FPOperation>Stores PIN number in operative memory.</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <Arg Name="" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="PINnum" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for PIN registration number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Password[6]> <;> <'1'> <;> <PINnum[11]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

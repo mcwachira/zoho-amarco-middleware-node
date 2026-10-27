@@ -1,0 +1,13 @@
+﻿<Command Name="ReadServiceContractExpiryDate">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionActivation" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Res>
+    <Res Name="ExpiryDate" Value="" Type="DateTime" MaxLen="10" Format="ddMMyyyy" />
+  </Response>
+</Command>

@@ -1,0 +1,20 @@
+﻿<Command Name="ReadOrStoreInvoiceCopy" CmdByte="0x7C">
+  <FPOperation>Read/Store Invoice receipt copy to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionInvoiceCopy" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Reading" Value="J0" />
+        <Option Name="Storage in External SD card memory" Value="J4" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J0' - Reading  
+ - 'J4' - Storage in External SD card memory</Desc>
+    </Arg>
+    <Arg Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="CUInvoiceNum" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for Invoice receipt Number.</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <OptionInvoiceCopy[2]><;><'I'><;> <CUInvoiceNum[10]>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

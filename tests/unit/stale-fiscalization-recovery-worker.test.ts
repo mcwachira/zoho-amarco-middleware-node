@@ -81,7 +81,7 @@ describe("startStaleFiscalizationRecoveryWorker", () => {
 
   it("logs failures and schedules another run", async () => {
     const service = createService();
-    const error = new Error("Database unavailable");
+    const error = new Error("Database unavailable; synthetic-access-token");
 
     vi.mocked(service.execute).mockRejectedValueOnce(error).mockResolvedValueOnce(0);
 
@@ -93,9 +93,10 @@ describe("startStaleFiscalizationRecoveryWorker", () => {
 
     await vi.advanceTimersByTimeAsync(INTERVAL_MS);
 
-    expect(logger.error).toHaveBeenCalledWith(
-      { err: error },
-      "Stale fiscalization recovery run failed",
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith("Stale fiscalization recovery run failed");
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(
+      "synthetic-access-token",
     );
 
     await vi.advanceTimersByTimeAsync(INTERVAL_MS);

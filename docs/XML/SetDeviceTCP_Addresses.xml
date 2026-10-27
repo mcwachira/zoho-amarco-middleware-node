@@ -1,0 +1,13 @@
+﻿<Command Name="SetDeviceTCP_Addresses">
+  <Args>
+    <Arg Name="OptionAddressType" Value="">
+      <Options>
+        <Option Name="DNS address" Value="5" />
+        <Option Name="Gateway address" Value="4" />
+        <Option Name="IP address" Value="2" />
+        <Option Name="Subnet Mask" Value="3" />
+      </Options>
+    </Arg>
+    <Arg Name="DeviceAddress" Value="" />
+  </Args>
+</Command>

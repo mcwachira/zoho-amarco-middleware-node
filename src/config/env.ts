@@ -51,6 +51,17 @@ export const envSchema = z
     ZOHO_CLIENT_ID: z.string().trim().min(1).optional(),
     ZOHO_CLIENT_SECRET: z.string().trim().min(1).optional(),
     ZOHO_ORGANIZATION_ID: z.string().trim().min(1).optional(),
+    ZOHO_SYNC_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    ZOHO_SYNC_INTERVAL_MS: z.coerce.number().int().min(60_000).max(86_400_000).default(900_000),
+    // Explicit provider selection only; neither option enables an unverified adapter.
+    ETIMS_REPORTING_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    ETIMS_ADAPTER: z.enum(["vscu", "oscu"]).optional(),
 
     // Must exactly match the redirect URI registered in Zoho API Console.
     ZOHO_REDIRECT_URI: z.string().url().default("http://localhost:3000/integrations/zoho/callback"),

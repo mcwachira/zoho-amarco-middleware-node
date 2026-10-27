@@ -1,0 +1,13 @@
+﻿<Command Name="DirectCommand" CmdByte="0xF1">
+  <FPOperation>Executes the direct command .</FPOperation>
+  <Args>
+    <Arg Name="Input" Value="" Type="Text" MaxLen="200">
+      <Desc>Raw request to FP</Desc>
+    </Arg>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Output" Value="" Type="Text" MaxLen="200">
+      <Desc>FP raw response</Desc>
+    </Res>
+  </Response>
+</Command>

@@ -16,6 +16,51 @@ describe("Environment configuration", () => {
     expect(result.FISCALIZATION_RECOVERY_STALE_AGE_MS).toBe(1_800_000);
   });
 
+  it("disables scheduled Zoho synchronization by default and bounds its interval", () => {
+    const result = envSchema.parse(validEnvironment);
+
+    expect(result.ZOHO_SYNC_ENABLED).toBe(false);
+    expect(result.ZOHO_SYNC_INTERVAL_MS).toBe(900_000);
+    expect(
+      envSchema.safeParse({ ...validEnvironment, ZOHO_SYNC_INTERVAL_MS: "1000" }).success,
+    ).toBe(false);
+  });
+
+  it("disables eTIMS reporting by default and does not select a provider implicitly", () => {
+    const result = envSchema.parse(validEnvironment);
+
+    expect(result.ETIMS_REPORTING_ENABLED).toBe(false);
+    expect(result.ETIMS_ADAPTER).toBeUndefined();
+  });
+
+  it.each(["vscu", "oscu"] as const)("accepts explicit eTIMS model selection: %s", (adapter) => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      ETIMS_REPORTING_ENABLED: "true",
+      ETIMS_ADAPTER: adapter,
+    });
+
+    expect(result.ETIMS_REPORTING_ENABLED).toBe(true);
+    expect(result.ETIMS_ADAPTER).toBe(adapter);
+  });
+
+  it("rejects unrecognized eTIMS model selections", () => {
+    expect(envSchema.safeParse({ ...validEnvironment, ETIMS_ADAPTER: "automatic" }).success).toBe(
+      false,
+    );
+  });
+
+  it("enables scheduled Zoho synchronization only when explicitly configured", () => {
+    const result = envSchema.parse({
+      ...validEnvironment,
+      ZOHO_SYNC_ENABLED: "true",
+      ZOHO_SYNC_INTERVAL_MS: "60000",
+    });
+
+    expect(result.ZOHO_SYNC_ENABLED).toBe(true);
+    expect(result.ZOHO_SYNC_INTERVAL_MS).toBe(60_000);
+  });
+
   it("enables stale fiscalization recovery only when explicitly configured", () => {
     const result = envSchema.parse({
       ...validEnvironment,

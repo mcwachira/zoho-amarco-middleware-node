@@ -1,0 +1,25 @@
+﻿<Command Name="ReadDeviceTCP_Addresses">
+  <Args>
+    <Arg Name="OptionAddressType" Value="">
+      <Options>
+        <Option Name="DNS address" Value="5" />
+        <Option Name="Gateway address" Value="4" />
+        <Option Name="IP address" Value="2" />
+        <Option Name="Subnet Mask" Value="3" />
+      </Options>
+    </Arg>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionAddressType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="DNS address" Value="5" />
+        <Option Name="Gateway address" Value="4" />
+        <Option Name="IP address" Value="2" />
+        <Option Name="Subnet Mask" Value="3" />
+      </Options>
+    </Res>
+    <Res Name="DeviceAddress" Value="" Type="Text" MaxLen="15" />
+  </Response>
+</Command>

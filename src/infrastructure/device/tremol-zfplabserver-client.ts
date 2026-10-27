@@ -15,6 +15,32 @@ export interface TremolCommandResponse {
   readonly body: string;
 }
 
+export interface TremolStatusFlags {
+  readonly readiness: "unknown";
+  readonly powerDownInOpenedFiscalReceipt: boolean | null;
+  readonly dateTimeNotSet: boolean | null;
+  readonly dateTimeWrong: boolean | null;
+  readonly ramReset: boolean | null;
+  readonly hardwareClockError: boolean | null;
+  readonly registersOverflow: boolean | null;
+  readonly fiscalReceiptOpened: boolean | null;
+  readonly receiptInvoiceType: boolean | null;
+  readonly sdCardNearFull: boolean | null;
+  readonly sdCardFull: boolean | null;
+  readonly cuFiscalized: boolean | null;
+  readonly cuProduced: boolean | null;
+  readonly pairedWithTims: boolean | null;
+  readonly unsentReceipts: boolean | null;
+  readonly serviceContractNearlyExpired: boolean | null;
+  readonly noSecurityIc: boolean | null;
+  readonly noCertificates: boolean | null;
+  readonly serviceJumper: boolean | null;
+  readonly expiredServiceContract: boolean | null;
+  readonly missingSdCard: boolean | null;
+  readonly wrongSdCard: boolean | null;
+  readonly updateAvailable: boolean | null;
+}
+
 export interface TremolClientOptions {
   readonly baseUrl: string;
   readonly timeoutMs?: number;
@@ -47,7 +73,8 @@ export class TremolDeviceError extends Error {
 }
 
 /**
- * Indicates that the response did not match the documented XML envelope.
+ * Indicates that the response did not match the documented ZFP XML envelope
+ * or a command-specific field could not be validated.
  */
 export class TremolProtocolError extends Error {
   constructor(message: string) {
@@ -118,6 +145,166 @@ function parseResultCode(body: string): number {
   return resultCode;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The Kenya protocol defines six raw status bytes, but the supplied
+ * ZFPLabServer documentation does not define their XML result names or value
+ * serialization. Until that mapping is confirmed, all individual flags stay
+ * unknown and readiness is never inferred.
+ */
+export function parseTremolStatusFlags(body: string): TremolStatusFlags {
+  const resultCode = parseResultCode(body);
+  if (resultCode !== 0) {
+    throw new TremolDeviceError(resultCode, body);
+  }
+
+  return {
+    readiness: "unknown",
+    powerDownInOpenedFiscalReceipt: null,
+    dateTimeNotSet: null,
+    dateTimeWrong: null,
+    ramReset: null,
+    hardwareClockError: null,
+    registersOverflow: null,
+    fiscalReceiptOpened: null,
+    receiptInvoiceType: null,
+    sdCardNearFull: null,
+    sdCardFull: null,
+    cuFiscalized: null,
+    cuProduced: null,
+    pairedWithTims: null,
+    unsentReceipts: null,
+    serviceContractNearlyExpired: null,
+    noSecurityIc: null,
+    noCertificates: null,
+    serviceJumper: null,
+    expiredServiceContract: null,
+    missingSdCard: null,
+    wrongSdCard: null,
+    updateAvailable: null,
+  };
+}
+
+export interface TremolCloseReceiptMetadata {
+  readonly invoiceNumber: string;
+  readonly qrCode: string;
+}
+
+/**
+ * Parses the documented CloseReceipt result fields from a successful generic
+ * ZFPLabServer XML response. This is a parser only; it does not execute a
+ * fiscal command or establish that a real receipt was issued.
+ */
+export function parseTremolCloseReceiptMetadata(body: string): TremolCloseReceiptMetadata {
+  const resultCode = parseResultCode(body);
+  if (resultCode !== 0) {
+    throw new TremolDeviceError(resultCode, body);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = xmlParser.parse(body);
+  } catch {
+    throw new TremolProtocolError("ZFPLabServer returned an unparseable XML response.");
+  }
+
+  if (!isRecord(parsed) || !isRecord(parsed["Res"])) {
+    throw new TremolProtocolError("ZFPLabServer returned an invalid Res element.");
+  }
+
+  const resultValues = parsed["Res"]["Res"];
+  const entries = Array.isArray(resultValues)
+    ? resultValues
+    : resultValues === undefined
+      ? []
+      : [resultValues];
+
+  function requiredValue(name: "InvoiceNum" | "QRcode", maxLength: number): string {
+    const matches = entries.filter((entry) => isRecord(entry) && entry["@_Name"] === name);
+    if (matches.length !== 1 || !isRecord(matches[0])) {
+      throw new TremolProtocolError(
+        `ZFPLabServer response must contain exactly one ${name} value.`,
+      );
+    }
+
+    const value = matches[0]["@_Value"];
+    if (
+      typeof value !== "string" ||
+      value.length > maxLength ||
+      (name === "InvoiceNum" && value.trim().length === 0)
+    ) {
+      throw new TremolProtocolError(`ZFPLabServer returned an invalid ${name} value.`);
+    }
+
+    return value;
+  }
+
+  return {
+    invoiceNumber: requiredValue("InvoiceNum", 19),
+    qrCode: requiredValue("QRcode", 128),
+  };
+}
+
+export function parseTremolVersion(body: string): string {
+  const validation = XMLValidator.validate(body);
+  if (validation !== true) {
+    throw new TremolProtocolError("ZFPLabServer returned malformed XML.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = xmlParser.parse(body);
+  } catch {
+    throw new TremolProtocolError("ZFPLabServer returned an unparseable XML response.");
+  }
+
+  if (!isRecord(parsed) || Object.keys(parsed).length !== 1 || !("Res" in parsed)) {
+    throw new TremolProtocolError(
+      "ZFPLabServer response must contain exactly one Res root element.",
+    );
+  }
+
+  const root = parsed["Res"];
+  if (!isRecord(root)) {
+    throw new TremolProtocolError("ZFPLabServer returned an invalid Res element.");
+  }
+
+  const resultCodeValue = root["@_Code"];
+  if (typeof resultCodeValue !== "string" || !/^\d+$/.test(resultCodeValue)) {
+    throw new TremolProtocolError("ZFPLabServer response must contain a numeric Code attribute.");
+  }
+  const resultCode = Number(resultCodeValue);
+  if (!Number.isSafeInteger(resultCode)) {
+    throw new TremolProtocolError("ZFPLabServer returned an invalid result code.");
+  }
+  if (resultCode !== 0) {
+    throw new TremolDeviceError(resultCode, body);
+  }
+
+  const resultValues = root["Res"];
+  const entries = Array.isArray(resultValues)
+    ? resultValues
+    : resultValues === undefined
+      ? []
+      : [resultValues];
+  const versions = entries.filter(
+    (entry): entry is Record<string, unknown> => isRecord(entry) && entry["@_Name"] === "Version",
+  );
+  if (versions.length !== 1) {
+    throw new TremolProtocolError("ZFPLabServer response must contain exactly one Version value.");
+  }
+
+  const version = versions[0]?.["@_Value"];
+  if (typeof version !== "string" || !version.trim() || version.length > 30) {
+    throw new TremolProtocolError("ZFPLabServer returned an invalid Version value.");
+  }
+
+  return version.trim();
+}
+
 export class TremolZfpLabServerClient {
   private readonly baseUrl: URL;
   private readonly timeoutMs: number;
@@ -158,6 +345,28 @@ export class TremolZfpLabServerClient {
     );
 
     return operation;
+  }
+
+  async readStatus(): Promise<{
+    readonly response: TremolCommandResponse;
+    readonly flags: TremolStatusFlags;
+  }> {
+    const response = await this.executeRead("ReadStatus()");
+    return {
+      response,
+      flags: parseTremolStatusFlags(response.body),
+    };
+  }
+
+  async readVersion(): Promise<{
+    readonly response: TremolCommandResponse;
+    readonly version: string;
+  }> {
+    const response = await this.executeRead("ReadVersion()");
+    return {
+      response,
+      version: parseTremolVersion(response.body),
+    };
   }
 
   private async executeReadInternal(command: TremolReadCommand): Promise<TremolCommandResponse> {

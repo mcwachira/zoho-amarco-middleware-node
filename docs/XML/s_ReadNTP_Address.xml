@@ -1,0 +1,21 @@
+﻿<Command Name="ReadNTP_Address" CmdByte="0x4E">
+  <FPOperation>Provides information about device's NTP address.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'S'><;><'N' > ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="AddressLen" Value="" Type="Decimal" MaxLen="3">
+      <Desc>Up to 3 symbols for the address length</Desc>
+    </Res>
+    <Res Name="NTPAddress" Value="" Type="Text" MaxLen="50">
+      <Desc>(NTP Address)50 symbols for the device's NTP address</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'S'><;><'N'><;><AddressLen[1..3]><;><NTPAddress[50]>]]></ResFormatRaw>
+  </Response>
+</Command>

@@ -1,0 +1,11 @@
+﻿<Command Name="EraseHScodes" CmdByte="0x4F">
+  <FPOperation>Erase HS codes.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionR" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6 symbols for password</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['z']><;><OptionR['D']><;><Password[6]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

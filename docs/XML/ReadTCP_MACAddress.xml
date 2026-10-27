@@ -1,0 +1,9 @@
+﻿<Command Name="ReadTCP_MACAddress">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="6" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="MACAddress" Value="" Type="Text" MaxLen="12" />
+  </Response>
+</Command>

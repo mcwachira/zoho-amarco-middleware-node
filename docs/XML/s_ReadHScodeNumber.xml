@@ -1,0 +1,16 @@
+﻿<Command Name="ReadHScodeNumber" CmdByte="0x4F">
+  <FPOperation>Read the number of HS codes.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['z']> <;><OptionR['R']>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="HScodesNumber" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>4 symbols for HS codes number in format ####</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['z']> <;><OptionR['R']><;>< HScodesNumber [4]>]]></ResFormatRaw>
+  </Response>
+</Command>

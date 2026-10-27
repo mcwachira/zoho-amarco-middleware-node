@@ -1,0 +1,3 @@
+﻿<Command Name="InfoLastReceiptDuplicate" CmdByte="0x3A">
+  <FPOperation>Informs about the issued document</FPOperation>
+</Command>

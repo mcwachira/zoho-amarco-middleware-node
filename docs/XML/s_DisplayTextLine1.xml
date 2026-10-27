@@ -1,0 +1,9 @@
+﻿<Command Name="DisplayTextLine1" CmdByte="0x25">
+  <FPOperation>Shows a 20-symbols text in the upper external display line.</FPOperation>
+  <Args>
+    <Arg Name="Text" Value="" Type="Text" MaxLen="16">
+      <Desc>16 symbols text</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Text[16]>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

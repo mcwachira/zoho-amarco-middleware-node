@@ -28,11 +28,9 @@ const invoiceLineSchema = z.object({
   item_id: optionalTextSchema,
   name: optionalTextSchema,
   description: optionalTextSchema,
-
   quantity: decimalValueSchema,
   rate: decimalValueSchema,
   item_total: decimalValueSchema,
-
   // Preserve tax metadata for later, verified fiscal mapping.
   tax_id: optionalTextSchema,
   tax_name: optionalTextSchema,
@@ -43,9 +41,7 @@ const invoiceLineSchema = z.object({
 const invoiceSourceSchema = z.object({
   invoice_id: z.string().trim().min(1),
   currency_code: z.string().trim().min(1),
-
   line_items: z.array(invoiceLineSchema).min(1),
-
   sub_total: decimalValueSchema,
   tax_total: decimalValueSchema,
   total: decimalValueSchema,
@@ -63,7 +59,6 @@ export interface FiscalInvoiceCandidate {
   readonly customerId: string | null;
   readonly customerName: string | null;
   readonly currencyCode: string;
-
   readonly lines: readonly {
     readonly sourceLineId: string | null;
     readonly itemId: string | null;
@@ -76,7 +71,6 @@ export interface FiscalInvoiceCandidate {
     readonly taxType: string | null;
     readonly taxPercentage: string | null;
   }[];
-
   readonly subtotal: string;
   readonly taxTotal: string;
   readonly total: string;
@@ -128,6 +122,24 @@ export function mapZohoInvoice(invoice: ZohoInvoice): InvoiceMappingResult {
     };
   }
 
+  // The client extracts this field from the same Zoho invoice response.
+  // Reject contradictory or missing top-level currency metadata instead
+  // of silently accepting two different currency values.
+  const retrievedCurrencyCode = invoice.currencyCode?.trim() ?? "";
+
+  if (retrievedCurrencyCode !== source.currency_code) {
+    return {
+      success: false,
+      errors: [
+        {
+          field: "currency_code",
+          message:
+            "The currency code from retrieved invoice metadata does not match the invoice source currency code.",
+        },
+      ],
+    };
+  }
+
   return {
     success: true,
     candidate: {
@@ -136,7 +148,6 @@ export function mapZohoInvoice(invoice: ZohoInvoice): InvoiceMappingResult {
       customerId: invoice.customerId,
       customerName: invoice.customerName,
       currencyCode: source.currency_code,
-
       lines: source.line_items.map((line) => ({
         sourceLineId: line.line_item_id ?? null,
         itemId: line.item_id ?? null,
@@ -149,7 +160,6 @@ export function mapZohoInvoice(invoice: ZohoInvoice): InvoiceMappingResult {
         taxType: line.tax_type ?? null,
         taxPercentage: line.tax_percentage ?? null,
       })),
-
       subtotal: source.sub_total,
       taxTotal: source.tax_total,
       total: source.total,

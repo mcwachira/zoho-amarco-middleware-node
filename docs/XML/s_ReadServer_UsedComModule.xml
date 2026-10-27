@@ -1,0 +1,24 @@
+﻿<Command Name="ReadServer_UsedComModule" CmdByte="0x4E">
+  <FPOperation>Read device communication usage with server</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="E" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'S'><;><'E'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="E" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="GSM" Value="0" />
+        <Option Name="LAN/WiFi" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0' - GSM 
+ - '1' - LAN/WiFi</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'S'><;><'E'><;><Module [1]>]]></ResFormatRaw>
+  </Response>
+</Command>

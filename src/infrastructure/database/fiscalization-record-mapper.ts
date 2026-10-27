@@ -1,4 +1,9 @@
 import type { FiscalizationRecord } from "../../domain/fiscalization/fiscalization-record.js";
+import {
+  FiscalizationSnapshotError,
+  parseFiscalizationSnapshot,
+} from "../../application/fiscalization/fiscalization-snapshot.js";
+import type { FiscalizationSnapshot } from "../../domain/fiscalization/fiscalization-snapshot.js";
 
 import {
   fiscalizationStatuses,
@@ -9,6 +14,8 @@ export interface FiscalizationRecordRow {
   id: string;
   zohoInvoiceId: string;
   status: string;
+  snapshotVersion: number | null;
+  snapshotJson: string | null;
   receiptNumber: string | null;
   issuedAt: Date | null;
   failureCode: string | null;
@@ -37,6 +44,32 @@ export function toDomainRecord(row: FiscalizationRecordRow): FiscalizationRecord
   if (dates.some((date) => Number.isNaN(date.getTime()))) {
     throw new Error("Database record contains an invalid date.");
   }
+
+  if ((row.snapshotJson === null) !== (row.snapshotVersion === null)) {
+    throw new FiscalizationSnapshotError("Database record contains incomplete snapshot metadata.");
+  }
+
+  let snapshot: FiscalizationSnapshot | null = null;
+  if (row.snapshotJson !== null) {
+    if (row.snapshotJson.length > 1_000_000) {
+      throw new FiscalizationSnapshotError("Database record exceeds the supported snapshot size.");
+    }
+
+    let value: unknown;
+    try {
+      value = JSON.parse(row.snapshotJson);
+    } catch {
+      throw new FiscalizationSnapshotError("Database record contains malformed snapshot JSON.");
+    }
+
+    snapshot = parseFiscalizationSnapshot(value, row.snapshotVersion);
+    if (snapshot.invoice.zohoInvoiceId !== row.zohoInvoiceId) {
+      throw new FiscalizationSnapshotError(
+        "Database snapshot invoice identity does not match the record.",
+      );
+    }
+  }
+
   const hasReceiptNumber = row.receiptNumber !== null;
   const hasIssuedAt = row.issuedAt !== null;
 
@@ -103,6 +136,8 @@ export function toDomainRecord(row: FiscalizationRecordRow): FiscalizationRecord
   return {
     id: row.id,
     zohoInvoiceId: row.zohoInvoiceId,
+    snapshot,
+    snapshotVersion: row.snapshotVersion,
     status: row.status,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
@@ -116,6 +151,8 @@ export function toDatabaseRecord(record: FiscalizationRecord) {
   return {
     id: record.id,
     zohoInvoiceId: record.zohoInvoiceId,
+    snapshotVersion: record.snapshot?.schemaVersion ?? null,
+    snapshotJson: record.snapshot === null ? null : JSON.stringify(record.snapshot),
     status: record.status,
     receiptNumber: record.receipt?.receiptNumber ?? null,
     issuedAt: record.receipt?.issuedAt ?? null,

@@ -1,0 +1,42 @@
+﻿<Command Name="ReadDailyAmountsByVAT" CmdByte="0x6D">
+  <FPOperation>Provides information about the accumulated amounts and refunded amounts by VAT class in case that CU regularly informs about the Z report(7C)</FPOperation>
+  <Response ACK="false">
+    <Res Name="SaleVATGrA" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the accumulated VAT in group A</Desc>
+    </Res>
+    <Res Name="SaleVATGrB" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the accumulated VAT in group B</Desc>
+    </Res>
+    <Res Name="SaleVATGrC" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the accumulated VAT in group C</Desc>
+    </Res>
+    <Res Name="SaleVATGrD" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the accumulated VAT in group D</Desc>
+    </Res>
+    <Res Name="SaleTurnoverVATGrE" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the accumulated turnover in group E</Desc>
+    </Res>
+    <Res Name="SaleTurnoverABCD" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the sale turnover in VAT groups A, B, C, D</Desc>
+    </Res>
+    <Res Name="RefundVATGrA" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund VAT in group A</Desc>
+    </Res>
+    <Res Name="RefundVATGrB" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund VAT in group B</Desc>
+    </Res>
+    <Res Name="RefundVATGrC" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund VAT in group C</Desc>
+    </Res>
+    <Res Name="RefundVATGrD" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund VAT in group D</Desc>
+    </Res>
+    <Res Name="RefundTurnoverVATGrE" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund accumulated turnover in group E</Desc>
+    </Res>
+    <Res Name="RefundTurnoverABCD" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for the refund turnover in VAT groups A, B, C, D</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<SaleVATGrA[1..15]> <;> <SaleVATGrB[1..15]> <;> <SaleVATGrC[1..15]> <;><SaleVATGrD[1..15]> <;><SaleTurnoverVATGrE[1..15]> <;> <SaleTurnoverABCD[1..15]> <;> <RefundVATGrA[1..15]> <;> <RefundVATGrB[1..15]> <;> <RefundVATGrC[1..15]> <;> <RefundVATGrD[1..15]> <;> <RefundTurnoverVATGrE[1..15]> <;> <RefundTurnoverABCD[1..15]>]]></ResFormatRaw>
+  </Response>
+</Command>

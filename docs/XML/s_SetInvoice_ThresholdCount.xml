@@ -1,0 +1,12 @@
+﻿<Command Name="SetInvoice_ThresholdCount" CmdByte="0x4E">
+  <FPOperation>Programs invoice threshold count</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Value" Value="" Type="Decimal" MaxLen="5">
+      <Desc>Up to 5 symbols for value</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'S'><;><'I'><;><Value[1..5]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

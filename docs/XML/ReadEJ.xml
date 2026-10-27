@@ -1,0 +1,4 @@
+﻿<Command Name="ReadEJ">
+  <Args />
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

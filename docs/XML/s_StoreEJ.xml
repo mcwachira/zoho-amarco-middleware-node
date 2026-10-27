@@ -1,0 +1,16 @@
+﻿<Command Name="StoreEJ" CmdByte="0x7C">
+  <FPOperation>Store whole Electronic Journal report to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionReportStorage" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J4' - Storage in External SD card memory 
+ - 'JX' - Storage in External SD card memory for JSON</Desc>
+    </Arg>
+    <Arg Name="" Value="*" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <OptionReportStorage[2]><;><'*'> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

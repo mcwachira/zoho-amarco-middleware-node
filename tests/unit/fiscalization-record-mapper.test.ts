@@ -10,14 +10,43 @@ import {
   markOutcomeUnknown,
   startFiscalization,
 } from "../../src/domain/fiscalization/fiscalization-operations.js";
+import { makeFiscalizationSnapshot } from "./fiscalization-snapshot-fixture.js";
+import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
 
 const now = new Date("2026-10-23T07:00:00.000Z");
+const invoice: FiscalInvoiceCandidate = {
+  zohoInvoiceId: "zoho-invoice-1",
+  invoiceNumber: "INV-001",
+  customerId: "customer-1",
+  customerName: "Example Customer",
+  currencyCode: "KES",
+  lines: [
+    {
+      sourceLineId: "line-1",
+      itemId: "item-1",
+      description: "Test product",
+      quantity: "1",
+      unitPrice: "10.10",
+      lineTotal: "10.10",
+      taxId: "tax-1",
+      taxName: "Source tax",
+      taxType: "tax",
+      taxPercentage: "16",
+    },
+  ],
+  subtotal: "10.10",
+  taxTotal: "1.616",
+  total: "11.716",
+};
+const snapshot = await makeFiscalizationSnapshot(invoice);
 
 function makeRow(overrides: Partial<FiscalizationRecordRow> = {}): FiscalizationRecordRow {
   return {
     id: "fiscalization-1",
     zohoInvoiceId: "zoho-invoice-1",
     status: "Pending",
+    snapshotVersion: null,
+    snapshotJson: null,
     receiptNumber: null,
     issuedAt: null,
     failureCode: null,
@@ -37,6 +66,40 @@ describe("Fiscalization record mapper", () => {
     expect(result.status).toBe("Pending");
     expect(result.receipt).toBeNull();
     expect(result.failure).toBeNull();
+  });
+
+  it("round-trips an immutable snapshot through database columns", () => {
+    const record = createFiscalizationRecord(
+      { id: "fiscalization-1", zohoInvoiceId: invoice.zohoInvoiceId, snapshot },
+      now,
+    );
+    const columns = toDatabaseRecord(record);
+
+    expect(columns.snapshotVersion).toBe(snapshot.schemaVersion);
+    expect(JSON.parse(columns.snapshotJson ?? "null")).toEqual(snapshot);
+    expect(
+      toDomainRecord(
+        makeRow({
+          snapshotVersion: snapshot.schemaVersion,
+          snapshotJson: columns.snapshotJson,
+        }),
+      ).snapshot,
+    ).toEqual(snapshot);
+  });
+
+  it("fails closed for malformed and unsupported persisted snapshots", () => {
+    expect(() => toDomainRecord(makeRow({ snapshotVersion: 1, snapshotJson: "{invalid" }))).toThrow(
+      "malformed snapshot JSON",
+    );
+
+    const unsupported = { ...snapshot, schemaVersion: 2 };
+    expect(() =>
+      toDomainRecord({
+        ...makeRow(),
+        snapshotVersion: 2,
+        snapshotJson: JSON.stringify(unsupported),
+      }),
+    ).toThrow("not supported");
   });
 
   it("maps receipt information correctly", () => {

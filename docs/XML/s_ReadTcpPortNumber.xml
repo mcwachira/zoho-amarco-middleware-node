@@ -1,0 +1,18 @@
+﻿<Command Name="ReadTcpPortNumber" CmdByte="0x4E">
+  <FPOperation>Provides information about device's TCP port number.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'Z'><;><'P'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="TcpPortNumber" Value="" Type="Decimal_with_format" MaxLen="5" Format="00000">
+      <Desc>5 symbols for TCP port in format #####</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'Z'><;><'P'><;><TcpPortNumber[5]>]]></ResFormatRaw>
+  </Response>
+</Command>

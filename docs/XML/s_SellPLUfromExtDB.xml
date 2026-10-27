@@ -1,0 +1,39 @@
+﻿<Command Name="SellPLUfromExtDB" CmdByte="0x31">
+  <FPOperation>Register the sell (for correction use minus sign in the price field) of article with specified name, price, quantity, VAT class and/or discount/addition on the transaction.</FPOperation>
+  <Args>
+    <Arg Name="NamePLU" Value="" Type="Text" MaxLen="36">
+      <Desc>36 symbols for article's name</Desc>
+    </Arg>
+    <Arg Name="OptionVATClass" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="VAT Class A" Value="A" />
+      </Options>
+      <Desc>1 symbol for article's VAT class with optional values:" 
+ - 'A' - VAT Class A</Desc>
+    </Arg>
+    <Arg Name="Price" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for article's price with upto 5 digits after decimal point</Desc>
+    </Arg>
+    <Arg Name="MeasureUnit" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for measure unit</Desc>
+    </Arg>
+    <Arg Name="HSCode" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for HS Code in format XXXX.XX.XX</Desc>
+    </Arg>
+    <Arg Name="HSName" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols for HS Name</Desc>
+    </Arg>
+    <Arg Name="VATGrRate" Value="" Type="Decimal" MaxLen="5">
+      <Desc>Up to 5 symbols for programmable VAT rate</Desc>
+    </Arg>
+    <Arg Name="Quantity" Value="" Type="Decimal" MaxLen="10">
+      <Desc>1 to 10 symbols for quantity</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="*" />
+    </Arg>
+    <Arg Name="DiscAddP" Value="" Type="Decimal" MaxLen="7">
+      <Desc>1 to 7 for percentage of discount/addition</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="," />
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <NamePLU[36]> <;> <OptionVATClass[1]> <;> <Price[1..15]> <;> <MeasureUnit[3]> <;><HSCode[10]> <;> <HSName[20]> <;> <VATGrRate[1..5]>  {<'*'> <Quantity[1..10]>} {<','> <DiscAddP[1..7]>}  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

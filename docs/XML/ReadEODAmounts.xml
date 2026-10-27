@@ -1,0 +1,10 @@
+﻿<Command Name="ReadEODAmounts">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="EOD_sale_turnover" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_credit_turnover" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_saleVAT" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_creditVAT" Value="" Type="Decimal" MaxLen="20" />
+  </Response>
+</Command>

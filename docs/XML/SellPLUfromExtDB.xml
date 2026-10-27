@@ -1,0 +1,17 @@
+﻿<Command Name="SellPLUfromExtDB">
+  <Args>
+    <Arg Name="NamePLU" Value="" />
+    <Arg Name="OptionVATClass" Value="">
+      <Options>
+        <Option Name="VAT Class A" Value="A" />
+      </Options>
+    </Arg>
+    <Arg Name="Price" Value="" />
+    <Arg Name="MeasureUnit" Value="" />
+    <Arg Name="HSCode" Value="" />
+    <Arg Name="HSName" Value="" />
+    <Arg Name="VATGrRate" Value="" />
+    <Arg Name="Quantity" Value="" Compulsory="false" />
+    <Arg Name="DiscAddP" Value="" Compulsory="false" />
+  </Args>
+</Command>

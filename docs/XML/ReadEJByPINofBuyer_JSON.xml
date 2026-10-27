@@ -1,0 +1,16 @@
+﻿<Command Name="ReadEJByPINofBuyer_JSON">
+  <Args>
+    <Arg Name="OptionPINReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="p" />
+        <Option Name="Detailed EJ" Value="P" />
+      </Options>
+    </Arg>
+    <Arg Name="PINnumber" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10" />
+  </Response>
+</Command>

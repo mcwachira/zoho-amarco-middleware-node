@@ -1,0 +1,12 @@
+﻿<Command Name="ProgramExpirationServiceContract">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="OptionActivation" Value="">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Arg>
+    <Arg Name="ExpiryDate" Value="" />
+  </Args>
+</Command>

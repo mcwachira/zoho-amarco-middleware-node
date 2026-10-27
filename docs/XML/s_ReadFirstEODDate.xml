@@ -1,0 +1,16 @@
+﻿<Command Name="ReadFirstEODDate" CmdByte="0x6D">
+  <FPOperation>Provides information about first EOD date</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Option" Value="f" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['d']> <;> <Option['f']> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Option" Value="f" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="DateTime" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>Date Time parameter in format: DDMMYY</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['d']> <;> <Option['f']> <;> <DateTime "DDMMYY">]]></ResFormatRaw>
+  </Response>
+</Command>

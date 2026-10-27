@@ -1,0 +1,6 @@
+﻿<Command Name="SetSerialNum">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="SerialNum" Value="" />
+  </Args>
+</Command>

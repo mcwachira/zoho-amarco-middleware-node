@@ -5,6 +5,8 @@ import { RegisterFiscalizationRequestService } from "../../src/application/fisca
 import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
 import { startFiscalization } from "../../src/domain/fiscalization/fiscalization-operations.js";
 import type { FiscalizationRecord } from "../../src/domain/fiscalization/fiscalization-record.js";
+import { makeFiscalizationSnapshot } from "./fiscalization-snapshot-fixture.js";
+import { DuplicateZohoInvoiceError } from "../../src/application/fiscalization/fiscalization-errors.js";
 
 const invoice: FiscalInvoiceCandidate = {
   zohoInvoiceId: "zoho-invoice-001",
@@ -31,9 +33,12 @@ const invoice: FiscalInvoiceCandidate = {
   total: "348",
 };
 
+const snapshot = await makeFiscalizationSnapshot(invoice);
+
 const input = {
   id: "fiscalization-001",
   invoice,
+  snapshot,
 };
 
 function createRepository() {
@@ -41,6 +46,9 @@ function createRepository() {
 
   const repository = {
     findById: vi.fn(async (id: string) => (currentRecord?.id === id ? currentRecord : null)),
+    findByZohoInvoiceId: vi.fn(async (zohoInvoiceId: string) =>
+      currentRecord?.zohoInvoiceId === zohoInvoiceId ? currentRecord : null,
+    ),
 
     create: vi.fn(async (record: FiscalizationRecord): Promise<void> => {
       currentRecord = record;
@@ -82,6 +90,7 @@ describe("RegisterFiscalizationRequestService", () => {
     );
     expect(result.status).toBe("Pending");
     expect(result.zohoInvoiceId).toBe(invoice.zohoInvoiceId);
+    expect(result.snapshot).toEqual(snapshot);
     expect(getCurrentRecord()).toEqual(result);
   });
 
@@ -104,5 +113,30 @@ describe("RegisterFiscalizationRequestService", () => {
     await expect(service.register(input)).rejects.toThrow("Database unavailable");
     expect(repository.create).toHaveBeenCalledTimes(1);
     expect(repository.claimPending).not.toHaveBeenCalled();
+  });
+
+  it("rejects a snapshot that does not match the invoice identity", async () => {
+    const { repository } = createRepository();
+    const service = new RegisterFiscalizationRequestService(repository);
+
+    await expect(
+      service.register({
+        ...input,
+        invoice: { ...invoice, zohoInvoiceId: "different-invoice" },
+      }),
+    ).rejects.toThrow("does not match the invoice registration input");
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it("propagates duplicate registration without replacing the original snapshot", async () => {
+    const { repository } = createRepository();
+    const duplicate = new DuplicateZohoInvoiceError(invoice.zohoInvoiceId);
+    repository.create.mockRejectedValue(duplicate);
+    const service = new RegisterFiscalizationRequestService(repository);
+
+    await expect(service.register(input)).rejects.toBe(duplicate);
+    expect(repository.create).toHaveBeenCalledOnce();
+    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ snapshot }));
+    expect(repository.saveOutcome).not.toHaveBeenCalled();
   });
 });

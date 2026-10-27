@@ -1,0 +1,15 @@
+﻿<Command Name="ProgramProxyServerAddress" CmdByte="0x4E">
+  <FPOperation>Program the proxy server address.</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="ParamLength" Value="" Type="Decimal" MaxLen="3">
+      <Desc>Up to 3 symbols for parameter length</Desc>
+    </Arg>
+    <Arg Name="Address" Value="" Type="Text" MaxLen="21">
+      <Desc>21 symbols for address</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'S'><;><'P'><;> <ParamLength[1..3]> <;> <Address[21]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

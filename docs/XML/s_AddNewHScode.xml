@@ -1,0 +1,30 @@
+﻿<Command Name="AddNewHScode" CmdByte="0x4F">
+  <FPOperation>Programs the customer DB for special customer receipt issuing.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionW" Value="W" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="reserved" Value="0000" Type="OptionHardcoded" MaxLen="4" />
+    <Arg Name="HS_Code" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for HS code</Desc>
+    </Arg>
+    <Arg Name="HS_Name" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols for name of HS group</Desc>
+    </Arg>
+    <Arg Name="OptionTaxable" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Exempted" Value="1" />
+        <Option Name="Taxable" Value="0" />
+      </Options>
+      <Desc>1 symbol for parameter: 
+- '1' - Exempted 
+- '0' - Taxable</Desc>
+    </Arg>
+    <Arg Name="MesureUnit" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for mesure unit of item's code</Desc>
+    </Arg>
+    <Arg Name="VAT_rate" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate from 2 to 5 symbols with format ##.##</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['Z']> <;>< OptionW['W']><;><reserved['0000']> <;> <HS_Code[10]> <;> <HS_Name[20]><;><OptionTaxable[1]><;><MesureUnit[3]><;><VAT_rate[2..6]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

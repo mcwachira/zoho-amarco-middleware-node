@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
 import helmet from "helmet";
 import * as pinoHttp from "pino-http";
+import type { Logger } from "pino";
 import { logger } from "./observability/logger.js";
 import type { ZohoOAuthService } from "./application/zoho/zoho-oauth-service.js";
 import { createZohoOAuthRouter } from "./routes/zoho-oauth-routes.js";
@@ -13,8 +14,16 @@ import type { PrepareFiscalizationRequestService } from "./application/fiscaliza
 import type { FiscalizationRepository } from "./application/fiscalization/fiscalization-repository.js";
 import type { FiscalizationService } from "./application/fiscalization/fiscalization-service.js";
 import type { FiscalDeviceDiagnostics } from "./application/fiscalization/fiscal-device-diagnostics.js";
+import type { PrepareTremolReceiptPlan } from "./application/fiscalization/prepare-tremol-receipt-plan.js";
+import type { FiscalCustomerProfileRepository } from "./application/fiscalization/fiscal-customer-profile-repository.js";
+import type { FiscalItemProfileRepository } from "./application/fiscalization/fiscal-item-profile-repository.js";
+import { createFiscalProfileRouter } from "./routes/fiscal-profile-routes.js";
+import type { ImportZohoInvoicesService } from "./application/zoho/import-zoho-invoices.js";
+import type { ZohoInvoiceSynchronizationService } from "./application/zoho/zoho-invoice-synchronization.js";
+import type { EtimsReportingService } from "./application/fiscalization/etims-reporting-service.js";
 
 export interface AppDependencies {
+  readonly requestLogger?: Logger;
   checkDatabaseConnection?: () => Promise<void>;
   oauthService?: ZohoOAuthService;
   booksClient?: ZohoBooksClient;
@@ -24,6 +33,12 @@ export interface AppDependencies {
   fiscalizationRepository?: FiscalizationRepository;
   readonly fiscalizationService?: FiscalizationService;
   readonly fiscalDeviceDiagnostics?: FiscalDeviceDiagnostics;
+  prepareTremolReceiptPlan?: PrepareTremolReceiptPlan;
+  readonly fiscalCustomerProfileRepository?: FiscalCustomerProfileRepository;
+  readonly fiscalItemProfileRepository?: FiscalItemProfileRepository;
+  readonly invoiceImportService?: ImportZohoInvoicesService;
+  readonly zohoInvoiceSynchronizationService?: ZohoInvoiceSynchronizationService;
+  readonly etimsReportingService?: EtimsReportingService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -32,7 +47,37 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.disable("x-powered-by");
 
   app.use(helmet());
-  app.use(pinoHttp.pinoHttp({ logger }));
+  app.use(
+    pinoHttp.pinoHttp({
+      logger: dependencies.requestLogger ?? logger,
+      serializers: {
+        req(request) {
+          let requestPath = "[unavailable]";
+          try {
+            requestPath = new URL(request.url ?? "/", "http://localhost").pathname;
+          } catch {
+            // Do not fall back to the raw URL, which may contain secrets.
+          }
+          const requestId =
+            "id" in request && (typeof request.id === "string" || typeof request.id === "number")
+              ? request.id
+              : undefined;
+
+          return {
+            ...(requestId !== undefined ? { id: requestId } : {}),
+            method: request.method,
+            url: requestPath,
+          };
+        },
+        res(response) {
+          return { statusCode: response.statusCode };
+        },
+        err() {
+          return { type: "RequestError" };
+        },
+      },
+    }),
+  );
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/health/live", (_req, res) => {
@@ -47,8 +92,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     try {
       await dependencies.checkDatabaseConnection();
       res.status(200).json({ status: "ready" });
-    } catch (error) {
-      logger.error({ err: error }, "Database readiness check failed");
+    } catch {
+      logger.error("Database readiness check failed");
       res.status(503).json({ status: "not_ready" });
     }
   });
@@ -81,12 +126,28 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(
     "/integrations/zoho",
     requireInvoiceApiToken(dependencies.invoiceApiBearerToken ?? env.INVOICE_API_BEARER_TOKEN),
+    createFiscalProfileRouter({
+      ...(dependencies.fiscalCustomerProfileRepository
+        ? { customerRepository: dependencies.fiscalCustomerProfileRepository }
+        : {}),
+      ...(dependencies.fiscalItemProfileRepository
+        ? { itemRepository: dependencies.fiscalItemProfileRepository }
+        : {}),
+    }),
+  );
+  app.use(
+    "/integrations/zoho",
+    requireInvoiceApiToken(dependencies.invoiceApiBearerToken ?? env.INVOICE_API_BEARER_TOKEN),
     createZohoBooksRouter(
       dependencies.booksClient,
       dependencies.invoiceService,
       dependencies.prepareFiscalizationRequestService,
       dependencies.fiscalizationRepository,
       dependencies.fiscalizationService,
+      dependencies.prepareTremolReceiptPlan,
+      dependencies.invoiceImportService,
+      dependencies.zohoInvoiceSynchronizationService,
+      dependencies.etimsReportingService,
     ),
   );
 
@@ -105,7 +166,22 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       return;
     }
 
-    req.log.error({ err: error }, "Unhandled request error");
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "type" in error &&
+      error.type === "entity.parse.failed"
+    ) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_JSON",
+          message: "The request body must contain valid JSON.",
+        },
+      });
+      return;
+    }
+
+    req.log.error("Unhandled request error");
     res.status(500).json({
       error: {
         code: "INTERNAL_SERVER_ERROR",

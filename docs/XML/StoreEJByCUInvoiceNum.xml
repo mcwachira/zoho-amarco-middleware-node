@@ -1,0 +1,18 @@
+﻿<Command Name="StoreEJByCUInvoiceNum">
+  <Args>
+    <Arg Name="OptionReportStorage" Value="">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+    </Arg>
+    <Arg Name="OptionInvoiceReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="n" />
+        <Option Name="Detailed EJ" Value="N" />
+      </Options>
+    </Arg>
+    <Arg Name="StartCUInvoiceNum" Value="" />
+    <Arg Name="EndCUInvoiceNum" Value="" />
+  </Args>
+</Command>

@@ -11,6 +11,8 @@ model FiscalizationRecord {
   id            String @id @default(cuid()) @db.VarChar(100)
   zohoInvoiceId String @unique @db.VarChar(255)
   status        String @default("Pending") @db.VarChar(32)
+  snapshotVersion Int?
+  snapshotJson    String? @db.Text
 
   receiptNumber String?   @db.VarChar(100)
   issuedAt      DateTime?
@@ -24,6 +26,45 @@ model FiscalizationRecord {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+/// Durable eTIMS state for one immutable fiscalization request.
+model EtimsReportingOperation {
+  id                       String   @id @db.VarChar(100)
+  fiscalizationRequestId   String   @unique @db.VarChar(100)
+  zohoInvoiceId            String   @db.VarChar(255)
+  adapterType              String?  @db.VarChar(10)
+  adapterConfigurationId   String?  @db.VarChar(255)
+  correlationId            String   @unique @db.VarChar(100)
+  status                   String   @db.VarChar(32)
+  payloadHash              String   @db.VarChar(64)
+  attemptNumber            Int      @default(0)
+  providerReference        String?  @db.VarChar(255)
+  providerMetadataJson     String?  @db.Text
+  errorCategory            String?  @db.VarChar(100)
+  errorMessage             String?  @db.VarChar(500)
+  reconciliationRequired   Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([zohoInvoiceId])
+}
+
+/// Append-only-attempt-level operational history; secrets and request bodies are excluded.
+model EtimsReportingAttempt {
+  id                 String    @id @db.VarChar(100)
+  operationId        String    @db.VarChar(100)
+  attemptNumber      Int
+  startedAt          DateTime
+  completedAt        DateTime?
+  outcome            String?   @db.VarChar(32)
+  providerReference  String?   @db.VarChar(255)
+  errorCategory      String?   @db.VarChar(100)
+  errorMessage       String?   @db.VarChar(500)
+
+  @@unique([operationId, attemptNumber])
+  @@index([operationId, startedAt])
 }
 
 /// Tracks a single Zoho OAuth authorization attempt.
@@ -51,6 +92,62 @@ model ZohoToken {
   accessTokenExpiresAt  DateTime
   apiDomain             String   @db.VarChar(255)
   scopes                String   @db.VarChar(2000)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+/// Explicitly configured fiscal identity and address for a Zoho customer.
+model FiscalCustomerProfile {
+  id                    String   @id @default(cuid()) @db.VarChar(100)
+  zohoCustomerId        String   @unique @db.VarChar(255)
+  companyName           String   @db.VarChar(30)
+  clientPin             String   @db.VarChar(14)
+  headquarters          String   @db.VarChar(30)
+  address               String   @db.VarChar(30)
+  postalCodeAndCity     String   @db.VarChar(30)
+  exemptionNumber       String?  @db.VarChar(30)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([clientPin])
+}
+
+/// Durable operational history for Zoho invoice synchronization.
+model ZohoSyncRun {
+  id                  String    @id @db.VarChar(100)
+  organizationId      String    @db.VarChar(255)
+  status              String    @default("Running") @db.VarChar(20)
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  discovered          Int       @default(0)
+  imported            Int       @default(0)
+  duplicatesSkipped   Int       @default(0)
+  rejected            Int       @default(0)
+  failed              Int       @default(0)
+  pagesRetrieved      Int       @default(0)
+  paginationComplete  Boolean   @default(false)
+  errorCode           String?   @db.VarChar(100)
+
+  @@index([organizationId, startedAt])
+}
+
+/// Lease-based cross-process synchronization lock, one row per organization.
+model ZohoSyncLock {
+  organizationId String   @id @db.VarChar(255)
+  leaseToken     String   @db.VarChar(100)
+  leaseExpiresAt DateTime
+  updatedAt      DateTime @updatedAt
+}
+
+/// Explicitly configured fiscal classification for a Zoho item.
+model FiscalItemProfile {
+  id                    String   @id @default(cuid()) @db.VarChar(100)
+  zohoItemId            String   @unique @db.VarChar(255)
+  measureUnit           String   @db.VarChar(3)
+  hsCode                String   @db.VarChar(10)
+  hsName                String   @db.VarChar(20)
+  vatClass              String   @db.VarChar(1)
+  vatGroupRate          String   @db.VarChar(20)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

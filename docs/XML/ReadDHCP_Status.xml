@@ -1,0 +1,14 @@
+﻿<Command Name="ReadDHCP_Status">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionDHCPEnabled" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Disabled" Value="0" />
+        <Option Name="Enabled" Value="1" />
+      </Options>
+    </Res>
+  </Response>
+</Command>

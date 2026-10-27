@@ -1,0 +1,10 @@
+﻿<Command Name="ReadHTTPS_Server">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="C" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="ParamLength" Value="" Type="Decimal" MaxLen="3" />
+    <Res Name="Address" Value="" Type="Text" MaxLen="50" />
+  </Response>
+</Command>

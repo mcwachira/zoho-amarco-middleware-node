@@ -1,0 +1,14 @@
+﻿<Command Name="ReadTCP_UsedModule">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionUsedModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="LAN module" Value="1" />
+        <Option Name="WiFi module" Value="2" />
+      </Options>
+    </Res>
+  </Response>
+</Command>

@@ -1,0 +1,16 @@
+﻿<Command Name="ReadEJByTraderSystemInvNum_JSON">
+  <Args>
+    <Arg Name="OptionTraderSystemReportFormat" Value="">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10" />
+  </Response>
+</Command>
