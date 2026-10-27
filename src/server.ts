@@ -8,13 +8,34 @@ import { ZohoInvoiceService } from "./application/zoho/zoho-invoice-service.js";
 import { startZohoOAuthAttemptCleanup } from "./application/zoho/zoho-oauth-attempt-cleanup.js";
 import { RegisterFiscalizationRequestService } from "./application/fiscalization/register-fiscalization-request.js";
 import { PrepareFiscalizationRequestService } from "./application/fiscalization/prepare-fiscalization-request.js";
+import { FiscalizationService } from "./application/fiscalization/fiscalization-service.js";
 import { RecoverStaleFiscalizationsService } from "./application/fiscalization/recover-stale-fiscalizations.js";
 import { startStaleFiscalizationRecoveryWorker } from "./application/fiscalization/stale-fiscalization-recovery-worker.js";
 import { TremolZfpLabServerClient } from "./infrastructure/device/tremol-zfplabserver-client.js";
 import { TremolDeviceDiagnostics } from "./infrastructure/device/tremol-device-diagnostics.js";
-
+import { PrepareTremolReceiptPlan } from "./application/fiscalization/prepare-tremol-receipt-plan.js";
+import { ImportZohoInvoicesService } from "./application/zoho/import-zoho-invoices.js";
+import { ZohoInvoiceSynchronizationService } from "./application/zoho/zoho-invoice-synchronization.js";
+import { startZohoInvoiceSyncWorker } from "./application/zoho/zoho-invoice-sync-worker.js";
+import { EtimsReportingService } from "./application/fiscalization/etims-reporting-service.js";
+import { UnverifiedEtimsAdapter } from "./application/fiscalization/etims-reporting-adapter.js";
 
 const databaseProvider = createFiscalizationRepositoryProvider();
+
+// Model selection is explicit. Both adapter implementations remain non-operational
+// until their contract, enrollment, mappings, and lifecycle are verified.
+const etimsReportingService = new EtimsReportingService(
+  databaseProvider.etimsReportingRepository,
+  [
+    new UnverifiedEtimsAdapter("vscu", env.ETIMS_ADAPTER === "vscu", env.ETIMS_REPORTING_ENABLED),
+    new UnverifiedEtimsAdapter("oscu", env.ETIMS_ADAPTER === "oscu", env.ETIMS_REPORTING_ENABLED),
+  ],
+  {
+    enabled: env.ETIMS_REPORTING_ENABLED,
+    ...(env.ETIMS_ADAPTER ? { selectedAdapterType: env.ETIMS_ADAPTER } : {}),
+    verifiedReceiptLifecycle: false,
+  },
+);
 
 // Configure the Tremol ZFPLabServer client.
 // Construction validates its settings but does not send device commands.
@@ -51,21 +72,64 @@ const booksClient =
     : undefined;
 
 const invoiceService = booksClient ? new ZohoInvoiceService(booksClient) : undefined;
+// Enable receipt-plan preparation only when invoice retrieval and both
+// fiscal-profile repositories are available. This builds a plan only;
+// it does not execute commands on the Tremol device.
+const prepareTremolReceiptPlan =
+  invoiceService &&
+  databaseProvider.fiscalCustomerProfileRepository &&
+  databaseProvider.fiscalItemProfileRepository
+    ? new PrepareTremolReceiptPlan(
+        databaseProvider.fiscalCustomerProfileRepository,
+        databaseProvider.fiscalItemProfileRepository,
+      )
+    : undefined;
 
 const registrationService = new RegisterFiscalizationRequestService(databaseProvider.repository);
+// The processing route is wired for status and operator-visible blocking, but
+// no issuer or verified payment/tax/device contracts are configured.
+const fiscalizationService = new FiscalizationService(
+  databaseProvider.repository,
+  undefined,
+  env.ZOHO_ORGANIZATION_ID ?? "",
+);
 
 const prepareFiscalizationRequestService = invoiceService
-  ? new PrepareFiscalizationRequestService(invoiceService, registrationService)
+  ? new PrepareFiscalizationRequestService(invoiceService, registrationService, {
+      zohoOrganizationId: env.ZOHO_ORGANIZATION_ID ?? "",
+      customerProfiles: databaseProvider.fiscalCustomerProfileRepository,
+      itemProfiles: databaseProvider.fiscalItemProfileRepository,
+    })
   : undefined;
+const invoiceImportService =
+  booksClient && prepareFiscalizationRequestService
+    ? new ImportZohoInvoicesService(booksClient, prepareFiscalizationRequestService)
+    : undefined;
+const zohoInvoiceSynchronizationService =
+  invoiceImportService && env.ZOHO_ORGANIZATION_ID
+    ? new ZohoInvoiceSynchronizationService(
+        env.ZOHO_ORGANIZATION_ID,
+        invoiceImportService,
+        databaseProvider.zohoSyncRepository,
+        { automaticEnabled: env.ZOHO_SYNC_ENABLED },
+      )
+    : undefined;
 
 const app = createApp({
   checkDatabaseConnection: databaseProvider.checkConnection,
   fiscalizationRepository: databaseProvider.repository,
+  fiscalizationService,
   ...(oauthService ? { oauthService } : {}),
   ...(booksClient ? { booksClient } : {}),
   ...(invoiceService ? { invoiceService } : {}),
   ...(prepareFiscalizationRequestService ? { prepareFiscalizationRequestService } : {}),
-    fiscalDeviceDiagnostics,
+  ...(invoiceImportService ? { invoiceImportService } : {}),
+  ...(zohoInvoiceSynchronizationService ? { zohoInvoiceSynchronizationService } : {}),
+  ...(prepareTremolReceiptPlan ? { prepareTremolReceiptPlan } : {}),
+  fiscalCustomerProfileRepository: databaseProvider.fiscalCustomerProfileRepository,
+  fiscalItemProfileRepository: databaseProvider.fiscalItemProfileRepository,
+  fiscalDeviceDiagnostics,
+  etimsReportingService,
 });
 
 const server = app.listen(env.PORT, () => {
@@ -95,6 +159,13 @@ const staleFiscalizationRecoveryWorker = env.FISCALIZATION_RECOVERY_ENABLED
       staleAgeMs: env.FISCALIZATION_RECOVERY_STALE_AGE_MS,
     })
   : undefined;
+const zohoInvoiceSyncWorker =
+  env.ZOHO_SYNC_ENABLED && zohoInvoiceSynchronizationService
+    ? startZohoInvoiceSyncWorker({
+        service: zohoInvoiceSynchronizationService,
+        intervalMs: env.ZOHO_SYNC_INTERVAL_MS,
+      })
+    : undefined;
 const SHUTDOWN_TIMEOUT_MS = 30_000;
 
 let shuttingDown = false;
@@ -121,7 +192,7 @@ function shutdown(signal: string): void {
 
   server.close((serverError) => {
     if (serverError) {
-      logger.error({ err: serverError }, "Error while closing HTTP server");
+      logger.error("Error while closing HTTP server");
       process.exitCode = 1;
     } else {
       logger.info("HTTP server closed");
@@ -130,6 +201,7 @@ function shutdown(signal: string): void {
     void Promise.allSettled([
       oauthAttemptCleanup.stop(),
       staleFiscalizationRecoveryWorker?.stop() ?? Promise.resolve(),
+      zohoInvoiceSyncWorker?.stop() ?? Promise.resolve(),
     ])
       .then(async (results) => {
         const failures = results.filter((result) => result.status === "rejected");
@@ -137,7 +209,7 @@ function shutdown(signal: string): void {
         if (failures.length > 0) {
           for (const failure of failures) {
             if (failure.status === "rejected") {
-              logger.error({ err: failure.reason }, "Failed to stop a background worker");
+              logger.error("Failed to stop a background worker");
             }
           }
 
@@ -151,8 +223,8 @@ function shutdown(signal: string): void {
         await databaseProvider.disconnect();
         logger.info("Database client disconnected");
       })
-      .catch((error: unknown) => {
-        logger.error({ err: error }, "Error while disconnecting database client");
+      .catch(() => {
+        logger.error("Error while disconnecting database client");
         process.exitCode = 1;
       })
       .finally(() => {
