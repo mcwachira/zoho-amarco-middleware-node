@@ -1,0 +1,10 @@
+﻿<Command Name="ReadNTP_Address">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="AddressLen" Value="" Type="Decimal" MaxLen="3" />
+    <Res Name="NTPAddress" Value="" Type="Text" MaxLen="50" />
+  </Response>
+</Command>

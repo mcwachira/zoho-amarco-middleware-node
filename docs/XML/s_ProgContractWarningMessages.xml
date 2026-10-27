@@ -1,0 +1,19 @@
+﻿<Command Name="ProgContractWarningMessages" CmdByte="0x5A">
+  <FPOperation>Program the service contract expired warning message text.</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="M" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6 symbols for service password</Desc>
+    </Arg>
+    <Arg Name="Line1" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 1</Desc>
+    </Arg>
+    <Arg Name="Line2" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 2</Desc>
+    </Arg>
+    <Arg Name="Line3" Value="" Type="Text" MaxLen="64">
+      <Desc>TextLength symbols for warning message of line 3</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['M']> <;><Password[6]> <;> <Line1[TextLength]> <;><Line2[TextLength]> <;> <Line3[TextLength]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

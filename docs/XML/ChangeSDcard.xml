@@ -1,0 +1,7 @@
+﻿<Command Name="ChangeSDcard">
+  <Args>
+    <Arg Name="Password" Value="" />
+    <Arg Name="SerialNum" Value="" />
+    <Arg Name="PINnum" Value="" />
+  </Args>
+</Command>

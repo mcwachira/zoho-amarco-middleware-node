@@ -1,0 +1,5 @@
+﻿<Command Name="ReadVersion">
+  <Response ACK="false">
+    <Res Name="Version" Value="" Type="Text" MaxLen="30" />
+  </Response>
+</Command>

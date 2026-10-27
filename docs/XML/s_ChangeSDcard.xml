@@ -1,0 +1,16 @@
+﻿<Command Name="ChangeSDcard" CmdByte="0x41">
+  <FPOperation>Change SD card.</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <Arg Name="" Value="3" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="SerialNum" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols Manufacturing number for verification with original</Desc>
+    </Arg>
+    <Arg Name="PINnum" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for PIN registration number for verification with original</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Password[6]> <;> <'3'> <;> <SerialNum[20]><;><PINnum[11]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

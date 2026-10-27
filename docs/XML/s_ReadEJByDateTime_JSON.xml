@@ -1,0 +1,30 @@
+﻿<Command Name="ReadEJByDateTime_JSON" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by initial to end date and time in the JSON format. The number of bytes equal to Length for JSON data must be read subsequently.</FPOperation>
+  <Args>
+    <Arg Name="" Value="JY" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="t" />
+        <Option Name="Detailed EJ" Value="T" />
+      </Options>
+      <Desc>1 character with value 
+ - 'T' - Detailed EJ 
+ - 't' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="StartRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm">
+      <Desc>16 symbols for initial date in the DD-MM-</Desc>
+    </Arg>
+    <Arg Name="EndRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm">
+      <Desc>16 symbols for final date in the DD-MM-</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'JY'> <;> <ReportFormat[1]> <;> <StartRepFromDate "DD-MM-YYYY HH:MM"><;> <EndRepFromDate "DD-MM-YYYY HH:MM"> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10">
+      <Desc>Up to 10 symbols for length</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'JY'> <;> <'Z'> <;> <Length[1..10]>]]></ResFormatRaw>
+  </Response>
+</Command>

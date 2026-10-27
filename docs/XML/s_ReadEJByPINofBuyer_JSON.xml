@@ -1,0 +1,27 @@
+﻿<Command Name="ReadEJByPINofBuyer_JSON" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by PIN number of buyer in the JSON format. The number of bytes equal to Length for JSON data must be read subsequently.</FPOperation>
+  <Args>
+    <Arg Name="" Value="JY" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionPINReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="p" />
+        <Option Name="Detailed EJ" Value="P" />
+      </Options>
+      <Desc>1 character with value 
+ - 'P' - Detailed EJ 
+ - 'p' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="PINnumber" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for PIN number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'JY'> <;> < PINReportFormat[1]> <;> <PINnumber[11]>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10">
+      <Desc>Up to 10 symbols for length</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'JY'> <;> <'Z'> <;> <Length[1..10]>]]></ResFormatRaw>
+  </Response>
+</Command>

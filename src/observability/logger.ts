@@ -12,8 +12,16 @@ export const logger = pino({
 
       // Common credential fields.
       "*.password",
+      "*.code",
+      "*.state",
+      "*.code_verifier",
+      "*.codeVerifier",
+      "*.pkce_verifier",
+      "*.pkceVerifier",
       "*.client_secret",
       "*.clientSecret",
+      "*.authorization_code",
+      "*.authorizationCode",
       "*.access_token",
       "*.accessToken",
       "*.refresh_token",

@@ -1,0 +1,15 @@
+﻿<Command Name="Subtotal">
+  <Args>
+    <Arg Name="OptionDisplay" Value="">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Arg>
+    <Arg Name="DiscAddV" Value="" Compulsory="false" />
+    <Arg Name="DiscAddP" Value="" Compulsory="false" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="SubtotalValue" Value="" Type="Decimal" MaxLen="13" />
+  </Response>
+</Command>

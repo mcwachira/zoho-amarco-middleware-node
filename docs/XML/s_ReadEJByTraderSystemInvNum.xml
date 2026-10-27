@@ -1,0 +1,21 @@
+﻿<Command Name="ReadEJByTraderSystemInvNum" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by Trader System Invoice Number (Single Invoice).</FPOperation>
+  <Args>
+    <Arg Name="" Value="J0" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionTraderSystemReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="s" />
+        <Option Name="Detailed EJ" Value="S" />
+      </Options>
+      <Desc>1 character with value 
+ - 'S' - Detailed EJ 
+ - 's' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for trader system invoice 
+number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'J0'> <;> <TraderSystemReportFormat[1]> <;> <TraderSystemInvNum[15]> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

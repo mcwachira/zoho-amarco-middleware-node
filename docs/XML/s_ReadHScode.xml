@@ -1,0 +1,40 @@
+﻿<Command Name="ReadHScode" CmdByte="0x4F">
+  <FPOperation>Programs HS code at a given position (HS number in order).</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="HS_Number" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>4 symbols for HS number in order in format ####</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Option['Z']> <;><OptionR['R']><;><HS_Number[4]>  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="HS_Number" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000">
+      <Desc>4 symbols for HS number in order in format ####</Desc>
+    </Res>
+    <Res Name="HS_Code" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for HS code</Desc>
+    </Res>
+    <Res Name="HS_Name" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols for name of HS group</Desc>
+    </Res>
+    <Res Name="OptionTaxable" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Exempted" Value="1" />
+        <Option Name="Taxable" Value="0" />
+      </Options>
+      <Desc>1 symbol for parameter: 
+- '1' - Exempted 
+- '0' - Taxable</Desc>
+    </Res>
+    <Res Name="MesureUnit" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for mesure unit of item's code</Desc>
+    </Res>
+    <Res Name="VAT_Rate" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>(VAT rate) Value of VAT rate from 2 to 5 symbols with format ##.##</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['Z']> <;><OptionR['R']><;><HS_Number[4]> <;> <HS_Code[10]> <;> <HS_Name[20]> <;><OptionTaxable[1]> <;> <MesureUnit[3]> <;> < VAT_Rate[2..6]>]]></ResFormatRaw>
+  </Response>
+</Command>

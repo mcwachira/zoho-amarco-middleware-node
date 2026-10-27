@@ -1,0 +1,46 @@
+﻿<Command Name="OpenSellAndCloseReceipt" CmdByte="0x2C">
+  <FPOperation>Opens receipt after which makes sell of article with specified name, price, quantity, VAT class and/or discount/addition on the transaction and then closes the receipt</FPOperation>
+  <Args>
+    <Arg Name="ReceiptType" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for the trader system invoice number</Desc>
+    </Arg>
+    <Arg Name="NamePLU" Value="" Type="Text" MaxLen="36">
+      <Desc>36 symbols for article's name</Desc>
+    </Arg>
+    <Arg Name="OptionVATClass" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="VAT Class A" Value="A" />
+      </Options>
+      <Desc>1 symbol for article's VAT class with optional values:" 
+ - 'A' - VAT Class A</Desc>
+    </Arg>
+    <Arg Name="Price" Value="" Type="Decimal" MaxLen="15">
+      <Desc>Up to 15 symbols for article's price with upto 5 digits after decimal point</Desc>
+    </Arg>
+    <Arg Name="MeasureUnit" Value="" Type="Text" MaxLen="3">
+      <Desc>3 symbols for measure unit</Desc>
+    </Arg>
+    <Arg Name="HSCode" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for HS Code in format XXXX.XX.XX</Desc>
+    </Arg>
+    <Arg Name="Quantity" Value="" Type="Decimal" MaxLen="10">
+      <Desc>1 to 10 symbols for quantity</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="*" />
+    </Arg>
+    <Arg Name="DiscAddP" Value="" Type="Decimal" MaxLen="7">
+      <Desc>1 to 7 for percentage of discount/addition</Desc>
+      <Meta MinLen="1" Compulsory="false" ValIndicatingPresence="," />
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <ReceiptType['0']><;><TraderSystemInvNum[15]><;><NamePLU[36]> <;>  <OptionVATClass[1]> <;> <Price[1..15]> <;> <MeasureUnit[3]> <;><HSCode[10]>  {<'*'> <Quantity[1..10]>} {<','> <DiscAddP[1..7]>}  ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="InvoiceNum" Value="" Type="Text" MaxLen="19">
+      <Desc>19 symbols for CU invoice number</Desc>
+    </Res>
+    <Res Name="QRcode" Value="" Type="Text" MaxLen="128">
+      <Desc>128 symbols for QR code</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<InvoiceNum[19]<;><QRcode[128]>]]></ResFormatRaw>
+  </Response>
+</Command>

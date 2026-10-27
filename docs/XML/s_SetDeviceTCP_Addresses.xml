@@ -1,0 +1,24 @@
+﻿<Command Name="SetDeviceTCP_Addresses" CmdByte="0x4E">
+  <FPOperation>Program device's network IP address, subnet mask, gateway address, DNS address. To apply use -SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionAddressType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="DNS address" Value="5" />
+        <Option Name="Gateway address" Value="4" />
+        <Option Name="IP address" Value="2" />
+        <Option Name="Subnet Mask" Value="3" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '2' - IP address 
+ - '3' - Subnet Mask 
+ - '4' - Gateway address 
+ - '5' - DNS address</Desc>
+    </Arg>
+    <Arg Name="DeviceAddress" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for the selected address</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'T'><;><AddressType[1]> <;><DeviceAddress[15]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

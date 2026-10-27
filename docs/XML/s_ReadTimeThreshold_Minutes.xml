@@ -1,0 +1,18 @@
+﻿<Command Name="ReadTimeThreshold_Minutes" CmdByte="0x4E">
+  <FPOperation>Read time threshold minutes</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'S'><;><'T'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Value" Value="" Type="Decimal" MaxLen="5">
+      <Desc>Up to 5 symbols for value</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'S'><;><'T'><;><Value[1..5]>]]></ResFormatRaw>
+  </Response>
+</Command>

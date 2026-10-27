@@ -1,0 +1,15 @@
+﻿<Command Name="ReadEJByDate" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by initial to end date.</FPOperation>
+  <Args>
+    <Arg Name="" Value="J0" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="" Value="D" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="StartRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>6 symbols for initial date in the DDMMYY format</Desc>
+    </Arg>
+    <Arg Name="EndRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy">
+      <Desc>6 symbols for final date in the DDMMYY format</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'J0'> <;> <'D'> <;> <StartRepFromDate "DDMMYY"><;>  <EndRepFromDate "DDMMYY"> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

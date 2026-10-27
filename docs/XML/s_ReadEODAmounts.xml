@@ -1,0 +1,23 @@
+﻿<Command Name="ReadEODAmounts" CmdByte="0x6D">
+  <FPOperation>Provides information about the accumulated EOD turnover and VAT</FPOperation>
+  <Args>
+    <Arg Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <Option['d']> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="EOD_sale_turnover" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD sale turnover</Desc>
+    </Res>
+    <Res Name="EOD_credit_turnover" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD credit turnover</Desc>
+    </Res>
+    <Res Name="EOD_saleVAT" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD VAT from sales</Desc>
+    </Res>
+    <Res Name="EOD_creditVAT" Value="" Type="Decimal" MaxLen="20">
+      <Desc>Up to 20 symbols for the EOD VAT from credit invoices</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<Option['d']> <;> <EOD_sale_turnover[1..20]> <;> <EOD_credit_turnover[1..20]> <;> <EOD_saleVAT[1..20]> <;> <EOD_creditVAT [1..20]> <;>]]></ResFormatRaw>
+  </Response>
+</Command>

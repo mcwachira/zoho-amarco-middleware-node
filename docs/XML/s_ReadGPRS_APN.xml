@@ -1,0 +1,21 @@
+﻿<Command Name="ReadGPRS_APN" CmdByte="0x4E">
+  <FPOperation>Provides information about device's GRPS APN.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="A" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'G'><;><'A'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="A" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="gprsAPNlength" Value="" Type="Decimal" MaxLen="3">
+      <Desc>Up to 3 symbols for the APN length</Desc>
+    </Res>
+    <Res Name="APN" Value="" Type="Text" MaxLen="100">
+      <Desc>(APN) Up to 100 symbols for the device's GPRS APN</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'G'><;><'A'><;><gprsAPNlength[1..3]><;><APN[100]>]]></ResFormatRaw>
+  </Response>
+</Command>

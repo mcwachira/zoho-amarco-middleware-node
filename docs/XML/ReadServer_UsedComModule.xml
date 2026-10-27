@@ -1,0 +1,14 @@
+﻿<Command Name="ReadServer_UsedComModule">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="E" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="GSM" Value="0" />
+        <Option Name="LAN/WiFi" Value="1" />
+      </Options>
+    </Res>
+  </Response>
+</Command>

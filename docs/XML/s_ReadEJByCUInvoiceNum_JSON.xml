@@ -1,0 +1,30 @@
+﻿<Command Name="ReadEJByCUInvoiceNum_JSON" CmdByte="0x7C">
+  <FPOperation>Read Electronic Journal Report by CU Invoice Number (Multiple invoices) in the JSON format. The number of bytes equal to Length for JSON data must be read subsequently.</FPOperation>
+  <Args>
+    <Arg Name="" Value="JY" Type="OptionHardcoded" MaxLen="2" />
+    <Arg Name="OptionInvoiceReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="n" />
+        <Option Name="Detailed EJ" Value="N" />
+      </Options>
+      <Desc>1 character with value 
+ - 'N' - Detailed EJ 
+ - 'n' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="StartCUInvoiceNum" Value="" Type="Decimal_with_format" MaxLen="10" Format="0000000000.">
+      <Desc>10 symbols for start CU invoice number in format: ##########.</Desc>
+    </Arg>
+    <Arg Name="EndCUInvoiceNum" Value="" Type="Decimal_with_format" MaxLen="10" Format="0000000000.">
+      <Desc>10 symbols for end CU invoice number in format: ##########.</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'JY'> <;> < InvoiceReportFormat[1]> <;> <StartCUInvoiceNum[10]> <;> <EndCUInvoiceNum[10]> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10">
+      <Desc>Up to 10 symbols for length</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'JY'> <;> <'Z'> <;> <Length[1..10]>]]></ResFormatRaw>
+  </Response>
+</Command>

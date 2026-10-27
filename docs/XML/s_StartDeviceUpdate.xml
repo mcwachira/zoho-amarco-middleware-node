@@ -1,0 +1,7 @@
+﻿<Command Name="StartDeviceUpdate" CmdByte="0x7C">
+  <FPOperation>Start a device update procedure if a new update is available.</FPOperation>
+  <Args>
+    <Arg Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'U'>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

@@ -1,0 +1,28 @@
+﻿<Command Name="ReadGPRS_AuthenticationType" CmdByte="0x4E">
+  <FPOperation>Read GPRS APN authentication type</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'G'><;><'N'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="N" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionAuthenticationType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="CHAP" Value="2" />
+        <Option Name="None" Value="0" />
+        <Option Name="PAP" Value="1" />
+        <Option Name="PAP or CHAP" Value="3" />
+      </Options>
+      <Desc>1 symbol with value: 
+- '0' - None 
+- '1' - PAP 
+- '2' - CHAP 
+- '3' - PAP or CHAP</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'G'><;><'N'><;><AuthenticationType[1]>]]></ResFormatRaw>
+  </Response>
+</Command>

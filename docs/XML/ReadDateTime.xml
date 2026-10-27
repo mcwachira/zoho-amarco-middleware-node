@@ -1,0 +1,5 @@
+﻿<Command Name="ReadDateTime">
+  <Response ACK="false">
+    <Res Name="DateTime" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm" />
+  </Response>
+</Command>

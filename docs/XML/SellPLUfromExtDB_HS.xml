@@ -1,0 +1,9 @@
+﻿<Command Name="SellPLUfromExtDB_HS">
+  <Args>
+    <Arg Name="NamePLU" Value="" />
+    <Arg Name="Price" Value="" />
+    <Arg Name="HSCode" Value="" />
+    <Arg Name="Quantity" Value="" Compulsory="false" />
+    <Arg Name="DiscAddP" Value="" Compulsory="false" />
+  </Args>
+</Command>

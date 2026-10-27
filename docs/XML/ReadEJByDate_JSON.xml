@@ -1,0 +1,11 @@
+﻿<Command Name="ReadEJByDate_JSON">
+  <Args>
+    <Arg Name="StartRepFromDate" Value="" />
+    <Arg Name="EndRepFromDate" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="JY" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="Length" Value="" Type="Decimal" MaxLen="10" />
+  </Response>
+</Command>

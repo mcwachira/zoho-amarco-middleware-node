@@ -1,0 +1,24 @@
+﻿<Command Name="ProgVATrates" CmdByte="0x42">
+  <FPOperation>Stores a block containing the values of the VAT rates into the CU</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <Arg Name="VATrateA" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate A from 2 to 6 symbols with format ##.##</Desc>
+    </Arg>
+    <Arg Name="VATrateB" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate B from 2 to 6 symbols with format ##.##</Desc>
+    </Arg>
+    <Arg Name="VATrateC" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate C from 2 to 6 symbols with format ##.##</Desc>
+    </Arg>
+    <Arg Name="VATrateD" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate D from 2 to 6 symbols with format ##.##</Desc>
+    </Arg>
+    <Arg Name="VATrateE" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00">
+      <Desc>Value of VAT rate E from 2 to 6 symbols with format ##.##</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Password[6]> <;> <VATrateA[1..6]> <;> <VATrateB[1..6]> <;> <VATrateC[1..6]> <;> <VATrateD[1..6]> <;><VATrateE[1..6]>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

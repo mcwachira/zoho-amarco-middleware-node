@@ -1,0 +1,5 @@
+﻿<Command Name="ProgramServerReadingTimeout">
+  <Args>
+    <Arg Name="ReadingTimeout" Value="" />
+  </Args>
+</Command>

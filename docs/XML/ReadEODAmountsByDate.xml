@@ -1,0 +1,15 @@
+﻿<Command Name="ReadEODAmountsByDate">
+  <Args>
+    <Arg Name="EOD_Date" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="d" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="EOD_Date" Value="" Type="DateTime" MaxLen="10" Format="ddMMyy" />
+    <Res Name="EOD_sale_turnover" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_credit_turnover" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_saleVAT" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="EOD_creditVAT" Value="" Type="Decimal" MaxLen="20" />
+    <Res Name="InvoiceCount" Value="" Type="Text" MaxLen="4" />
+    <Res Name="CreditCount" Value="" Type="Text" MaxLen="4" />
+  </Response>
+</Command>

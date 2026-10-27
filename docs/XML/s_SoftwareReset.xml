@@ -1,0 +1,9 @@
+﻿<Command Name="SoftwareReset" CmdByte="0x3F">
+  <FPOperation>Restore default parameters of the device.</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Password[6]>  ]]></ArgsFormatRaw>
+  </Args>
+</Command>

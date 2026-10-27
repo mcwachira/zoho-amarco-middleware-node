@@ -1,0 +1,5 @@
+﻿<Command Name="SoftwareReset">
+  <Args>
+    <Arg Name="Password" Value="" />
+  </Args>
+</Command>

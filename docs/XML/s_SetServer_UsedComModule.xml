@@ -1,0 +1,18 @@
+﻿<Command Name="SetServer_UsedComModule" CmdByte="0x4E">
+  <FPOperation>Program device used to talk with the server . To apply use - SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="S" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="E" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="GSM" Value="0" />
+        <Option Name="LAN/WiFi" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '0' - GSM 
+ - '1' - LAN/WiFi</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'S'><;><'E'><;><Module[1]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

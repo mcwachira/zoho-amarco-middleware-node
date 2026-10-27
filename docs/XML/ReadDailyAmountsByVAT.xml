@@ -1,0 +1,16 @@
+﻿<Command Name="ReadDailyAmountsByVAT">
+  <Response ACK="false">
+    <Res Name="SaleVATGrA" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="SaleVATGrB" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="SaleVATGrC" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="SaleVATGrD" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="SaleTurnoverVATGrE" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="SaleTurnoverABCD" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundVATGrA" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundVATGrB" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundVATGrC" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundVATGrD" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundTurnoverVATGrE" Value="" Type="Decimal" MaxLen="15" />
+    <Res Name="RefundTurnoverABCD" Value="" Type="Decimal" MaxLen="15" />
+  </Response>
+</Command>

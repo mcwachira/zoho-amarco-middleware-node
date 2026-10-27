@@ -1,0 +1,21 @@
+﻿<Command Name="OpenReceipt" CmdByte="0x30">
+  <FPOperation>Opens a fiscal receipt assigned to the specified operator number and operator password, parameters for receipt format and VAT type.</FPOperation>
+  <Args>
+    <Arg Name="reserved" Value="1" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="reserved" Value="     0" Type="OptionHardcoded" MaxLen="6" />
+    <Arg Name="OptionReceiptFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief" Value="0" />
+        <Option Name="Detailed" Value="1" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '1' - Detailed 
+ - '0' - Brief</Desc>
+    </Arg>
+    <Arg Name="ReceiptType" Value="0" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="TraderSystemInvNum" Value="" Type="Text" MaxLen="15">
+      <Desc>15 symbols for trader system invoice number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[<reserved['1']> <;> <reserved['     0']> <;> <ReceiptFormat[1]> <;> <ReceiptType['0']><;><TraderSystemInvNum[15]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

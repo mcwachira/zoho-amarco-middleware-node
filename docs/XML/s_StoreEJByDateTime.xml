@@ -1,0 +1,30 @@
+﻿<Command Name="StoreEJByDateTime" CmdByte="0x7C">
+  <FPOperation>Store Electronic Journal Report from report from datetime to datetime to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionReportStorage" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J4' - Storage in External SD card memory 
+ - 'JX' - Storage in External SD card memory for JSON</Desc>
+    </Arg>
+    <Arg Name="OptionReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="t" />
+        <Option Name="Detailed EJ" Value="T" />
+      </Options>
+      <Desc>1 character with value 
+ - 'T' - Detailed EJ 
+ - 't' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="StartRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm">
+      <Desc>16 symbols for initial date in the DD-MM-YYYY</Desc>
+    </Arg>
+    <Arg Name="EndRepFromDate" Value="" Type="DateTime" MaxLen="10" Format="dd-MM-yyyy HH:mm">
+      <Desc>16 symbols for final date in the DD-MM-YYYY</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[<OptionReportStorage[2]> <;> <ReportFormat[1]> <;> <StartRepFromDate "DD-MM-YYYY HH:MM"> <;> <EndRepFromDate "DD-MM-YYYY HH:MM"> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

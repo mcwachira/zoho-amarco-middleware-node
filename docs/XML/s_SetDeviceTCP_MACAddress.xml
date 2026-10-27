@@ -1,0 +1,12 @@
+﻿<Command Name="SetDeviceTCP_MACAddress" CmdByte="0x4E">
+  <FPOperation>Program device's MAC address . To apply use - SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="6" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="MACAddress" Value="" Type="Text" MaxLen="12">
+      <Desc>12 symbols for the MAC address</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'T'><;><'6'> <;><MACAddress[12]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

@@ -1,0 +1,18 @@
+﻿<Command Name="SetTCP_ActiveModule" CmdByte="0x4E">
+  <FPOperation>Selects the active communication module - LAN or WiFi. This option can be set only if the device has both modules at the same time. To apply use - SaveNetworkSettings()</FPOperation>
+  <Args>
+    <Arg Name="" Value="P" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="OptionUsedModule" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="LAN module" Value="1" />
+        <Option Name="WiFi module" Value="2" />
+      </Options>
+      <Desc>1 symbol with value: 
+ - '1' - LAN module 
+ - '2' - WiFi module</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <'P'><;><'Z'><;><'U'><;><UsedModule[1]><;> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

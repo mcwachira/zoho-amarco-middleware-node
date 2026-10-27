@@ -1,0 +1,8 @@
+﻿<Command Name="ReadHScodeNumber">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="HScodesNumber" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000" />
+  </Response>
+</Command>

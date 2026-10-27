@@ -1,0 +1,7 @@
+﻿<Command Name="ReadCUinvoiceNumber">
+  <Args />
+  <Response ACK="false">
+    <Res Name="Option" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="CU_InvoiceNumber" Value="" Type="Text" MaxLen="19" />
+  </Response>
+</Command>

@@ -53,7 +53,7 @@ describe("startZohoOAuthAttemptCleanup", () => {
 
   it("logs cleanup failures and continues scheduling future runs", async () => {
     const repository = createRepository();
-    const databaseError = new Error("Database cleanup failed");
+    const databaseError = new Error("Database cleanup failed with synthetic-refresh-token");
 
     vi.mocked(repository.deleteExpired)
       .mockRejectedValueOnce(databaseError)
@@ -66,9 +66,10 @@ describe("startZohoOAuthAttemptCleanup", () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(logger.error).toHaveBeenCalledWith(
-      { err: databaseError },
-      "Failed to clean up expired Zoho OAuth attempts",
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith("Failed to clean up expired Zoho OAuth attempts");
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(
+      "synthetic-refresh-token",
     );
 
     await vi.advanceTimersByTimeAsync(1_000);

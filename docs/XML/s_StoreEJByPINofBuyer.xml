@@ -1,0 +1,27 @@
+﻿<Command Name="StoreEJByPINofBuyer" CmdByte="0x7C">
+  <FPOperation>Store Electronic Journal Report by PIN number of buyer to External SD card.</FPOperation>
+  <Args>
+    <Arg Name="OptionReportStorage" Value="" Type="Option" MaxLen="2">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+      <Desc>2 symbols for destination: 
+ - 'J4' - Storage in External SD card memory 
+ - 'JX' - Storage in External SD card memory for JSON</Desc>
+    </Arg>
+    <Arg Name="OptionPINReportFormat" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Brief EJ" Value="p" />
+        <Option Name="Detailed EJ" Value="P" />
+      </Options>
+      <Desc>1 character with value 
+ - 'P' - Detailed EJ 
+ - 'p' - Brief EJ</Desc>
+    </Arg>
+    <Arg Name="PINnumber" Value="" Type="Text" MaxLen="11">
+      <Desc>11 symbols for PIN number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[<OptionReportStorage[2]> <;> <PINReportFormat[1]> <;> <PINnumber[11]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

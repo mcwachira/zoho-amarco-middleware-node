@@ -1,0 +1,12 @@
+﻿<Command Name="SetSerialNum" CmdByte="0x40">
+  <FPOperation>Stores the Manufacturing number into the operative memory.</FPOperation>
+  <Args>
+    <Arg Name="Password" Value="" Type="Text" MaxLen="6">
+      <Desc>6-symbols string</Desc>
+    </Arg>
+    <Arg Name="SerialNum" Value="" Type="Text" MaxLen="20">
+      <Desc>20 symbols Manufacturing number</Desc>
+    </Arg>
+    <ArgsFormatRaw><![CDATA[ <Password[6]> <;> <SerialNum[20]> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

@@ -1,0 +1,9 @@
+﻿<Command Name="Read_IdleTimeout">
+  <Args />
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="I" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="IdleTimeout" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000" />
+  </Response>
+</Command>

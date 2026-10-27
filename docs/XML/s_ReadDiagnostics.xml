@@ -1,0 +1,30 @@
+﻿<Command Name="ReadDiagnostics" CmdByte="0x22">
+  <FPOperation>Provides information about documents sending functions .</FPOperation>
+  <Response ACK="false">
+    <Res Name="OptionDeviceType" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="A Type" Value="1" />
+        <Option Name="B Type" Value="2" />
+      </Options>
+      <Desc>1 symbol for device type: 
+ - '1' - A Type 
+ - '2' - B Type</Desc>
+    </Res>
+    <Res Name="SDIdxPos" Value="" Type="Text" MaxLen="10">
+      <Desc>10 symbols for current SD index position of last sent receipt</Desc>
+    </Res>
+    <Res Name="LastInvoiceCUNum" Value="" Type="Text" MaxLen="19">
+      <Desc>19 symbols for number of last invoice according the CU</Desc>
+    </Res>
+    <Res Name="LastInvoiceDate" Value="" Type="Text" MaxLen="6">
+      <Desc>6 symbols for last invoice date in the DDMMYY format</Desc>
+    </Res>
+    <Res Name="LastEODDate" Value="" Type="Text" MaxLen="6">
+      <Desc>6 symbols for last sent EOD in the DDMMYY format</Desc>
+    </Res>
+    <Res Name="InvoicesSent" Value="" Type="Text" MaxLen="4">
+      <Desc>4 symbold for number of invoices sent for the current day</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<DeviceType[1]> <;> <SDIdxPos[10]> <;> <LastInvoiceCUNum[19]> <;> <LastInvoiceDate[6]> <;> <LastEODDate[6]> <;> <InvoicesSent[4]>]]></ResFormatRaw>
+  </Response>
+</Command>

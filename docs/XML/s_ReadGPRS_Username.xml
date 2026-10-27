@@ -1,0 +1,21 @@
+﻿<Command Name="ReadGPRS_Username" CmdByte="0x4E">
+  <FPOperation>Providing information about device's GPRS user name.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'G'><;><'U'> ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="G" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="U" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="gprsUserNameLength" Value="" Type="Decimal" MaxLen="3">
+      <Desc>Up to 3 symbols for the GPRS username length</Desc>
+    </Res>
+    <Res Name="Username" Value="" Type="Text" MaxLen="100">
+      <Desc>Up to 100 symbols for the device's GPRS username</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'G'><;><'U'><;><gprsUserNameLength[1..3]><;><Username[100]>]]></ResFormatRaw>
+  </Response>
+</Command>

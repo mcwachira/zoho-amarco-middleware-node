@@ -84,7 +84,7 @@ describe("ZohoBooksClient", () => {
       status: 503,
     } satisfies Partial<ZohoBooksApiError>);
 
-    expect(transport).toHaveBeenCalledOnce();
+    expect(transport).toHaveBeenCalledTimes(3);
   });
 
   it("rejects invalid JSON", async () => {
@@ -201,5 +201,206 @@ describe("ZohoBooksClient", () => {
       currencyCode: null,
       source: invoice,
     });
+  });
+
+  it("preserves monetary JSON number lexemes without parsing them as binary floats", async () => {
+    const responseText =
+      `{"invoice":{"invoice_id":"${invoiceId}","invoice_number":"INV-001","customer_id":"customer-123",` +
+      `"customer_name":"Example Customer","currency_code":"KES","line_items":[{"line_item_id":"line-1",` +
+      `"item_id":"item-1","quantity":1,"rate":0.10000000000000001,"item_total":0.10000000000000001}],` +
+      `"sub_total":0.10000000000000001,"tax_total":0,"total":0.10000000000000001}}`;
+    const { client } = createClient(new Response(responseText, { status: 200 }));
+
+    const result = await client.getInvoice(invoiceId);
+    const lineItems = result.source["line_items"] as Array<Record<string, unknown>>;
+
+    expect(lineItems[0]?.["rate"]).toBe("0.10000000000000001");
+    expect(result.source["total"]).toBe("0.10000000000000001");
+  });
+
+  it("retrieves a validated invoice-list page using Zoho pagination parameters", async () => {
+    const body =
+      '{"code":0,"invoices":[{"invoice_id":460000000012345678,"invoice_number":"INV-001"},' +
+      '{"invoice_id":"460000000012345679","invoice_number":"INV-002"}],' +
+      '"page_context":{"page":1,"per_page":2,"has_more_page":true}}';
+    const { client, transport } = createClient(new Response(body, { status: 200 }));
+
+    await expect(client.listInvoicesPage(1, 2)).resolves.toEqual({
+      page: 1,
+      invoices: [
+        { invoiceId: "460000000012345678", invoiceNumber: "INV-001" },
+        { invoiceId: "460000000012345679", invoiceNumber: "INV-002" },
+      ],
+      hasMore: true,
+    });
+
+    const parsedUrl = new URL(String(transport.mock.calls[0]?.[0]));
+    expect(parsedUrl.pathname).toBe("/books/v3/invoices");
+    expect(parsedUrl.searchParams.get("organization_id")).toBe("test-organization-id");
+    expect(parsedUrl.searchParams.get("page")).toBe("1");
+    expect(parsedUrl.searchParams.get("per_page")).toBe("2");
+  });
+
+  it("rejects incomplete or malformed invoice pagination metadata", async () => {
+    const { client } = createClient(
+      new Response(JSON.stringify({ invoices: [{ invoice_id: "invoice-1" }] }), { status: 200 }),
+    );
+
+    await expect(client.listInvoicesPage(1)).rejects.toThrow(
+      "Zoho Books returned an incomplete invoice-list page.",
+    );
+  });
+
+  it("rejects invalid invoice page arguments before making a request", async () => {
+    const { client, transport } = createClient(new Response("{}", { status: 200 }));
+
+    await expect(client.listInvoicesPage(0)).rejects.toThrow(
+      "Invoice page must be a positive integer.",
+    );
+    await expect(client.listInvoicesPage(1, 201)).rejects.toThrow(
+      "Invoice page size must be between 1 and 200.",
+    );
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it("retries rate-limited requests using the Retry-After delay", async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response("rate limited", { status: 429, headers: { "Retry-After": "2" } }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            invoices: [],
+            page_context: { page: 1, per_page: 200, has_more_page: false },
+          }),
+          { status: 200 },
+        ),
+      );
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const client = new ZohoBooksClient({
+      tokenProvider: {
+        getAccessToken: vi.fn().mockResolvedValue({
+          accessToken,
+          apiDomain: "https://www.zohoapis.com",
+          scopes: "ZohoBooks.invoices.READ",
+        }),
+      },
+      organizationId: "test-organization-id",
+      transport,
+      sleep,
+      maxRetryDelayMs: 5_000,
+    });
+
+    await expect(client.listInvoicesPage(1)).resolves.toMatchObject({
+      invoices: [],
+      hasMore: false,
+    });
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(2_000);
+  });
+
+  it("retries transient server failures with bounded backoff", async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error("network detail must not be exposed"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            invoices: [],
+            page_context: { page: 1, per_page: 200, has_more_page: false },
+          }),
+          { status: 200 },
+        ),
+      );
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const client = new ZohoBooksClient({
+      tokenProvider: {
+        getAccessToken: vi.fn().mockResolvedValue({
+          accessToken,
+          apiDomain: "https://www.zohoapis.com",
+          scopes: "ZohoBooks.invoices.READ",
+        }),
+      },
+      organizationId: "test-organization-id",
+      transport,
+      sleep,
+      retryBaseDelayMs: 100,
+      maxRetryDelayMs: 120,
+    });
+
+    await expect(client.listInvoicesPage(1)).resolves.toMatchObject({ hasMore: false });
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(100);
+  });
+
+  it("does not retry a rate-limit response when Retry-After exceeds the delay bound", async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("rate limited", { status: 429, headers: { "Retry-After": "60" } }),
+      );
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const client = new ZohoBooksClient({
+      tokenProvider: {
+        getAccessToken: vi.fn().mockResolvedValue({
+          accessToken,
+          apiDomain: "https://www.zohoapis.com",
+          scopes: "ZohoBooks.invoices.READ",
+        }),
+      },
+      organizationId: "test-organization-id",
+      transport,
+      sleep,
+      maxRetryDelayMs: 1_000,
+    });
+
+    await expect(client.listInvoicesPage(1)).rejects.toMatchObject({
+      name: "ZohoBooksApiError",
+      status: 429,
+    });
+    expect(transport).toHaveBeenCalledOnce();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("does not retry expired-auth responses", async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("unauthorized", { status: 401 }));
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const client = new ZohoBooksClient({
+      tokenProvider: {
+        getAccessToken: vi.fn().mockResolvedValue({
+          accessToken,
+          apiDomain: "https://www.zohoapis.com",
+          scopes: "ZohoBooks.invoices.READ",
+        }),
+      },
+      organizationId: "test-organization-id",
+      transport,
+      sleep,
+    });
+
+    await expect(client.listInvoicesPage(1)).rejects.toMatchObject({
+      name: "ZohoBooksApiError",
+      status: 401,
+    });
+    expect(transport).toHaveBeenCalledOnce();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Zoho API error envelope even when HTTP succeeds", async () => {
+    const { client, transport } = createClient(
+      new Response(JSON.stringify({ code: 57, message: "provider detail" }), { status: 200 }),
+    );
+
+    await expect(client.listInvoicesPage(1)).rejects.toMatchObject({
+      name: "ZohoBooksApiError",
+      status: 200,
+      apiCode: 57,
+      message: "Zoho Books rejected the invoice request.",
+    });
+    expect(transport).toHaveBeenCalledOnce();
   });
 });

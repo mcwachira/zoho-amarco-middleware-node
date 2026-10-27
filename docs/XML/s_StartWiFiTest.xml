@@ -1,0 +1,9 @@
+﻿<Command Name="StartWiFiTest" CmdByte="0x4E">
+  <FPOperation>Start WiFi test on the device the result</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="W" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'W'><;><'T'> ]]></ArgsFormatRaw>
+  </Args>
+</Command>

@@ -1,0 +1,10 @@
+﻿<Command Name="StoreEJ">
+  <Args>
+    <Arg Name="OptionReportStorage" Value="">
+      <Options>
+        <Option Name="Storage in External SD card memory" Value="J4" />
+        <Option Name="Storage in External SD card memory for JSON" Value="JX" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

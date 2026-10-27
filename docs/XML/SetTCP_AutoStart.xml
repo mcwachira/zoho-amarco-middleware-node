@@ -1,0 +1,10 @@
+﻿<Command Name="SetTCP_AutoStart">
+  <Args>
+    <Arg Name="OptionTCPAutoStart" Value="">
+      <Options>
+        <Option Name="No" Value="0" />
+        <Option Name="Yes" Value="1" />
+      </Options>
+    </Arg>
+  </Args>
+</Command>

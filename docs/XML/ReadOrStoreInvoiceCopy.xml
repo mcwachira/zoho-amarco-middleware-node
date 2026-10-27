@@ -1,0 +1,12 @@
+﻿<Command Name="ReadOrStoreInvoiceCopy">
+  <Args>
+    <Arg Name="OptionInvoiceCopy" Value="">
+      <Options>
+        <Option Name="Reading" Value="J0" />
+        <Option Name="Storage in External SD card memory" Value="J4" />
+      </Options>
+    </Arg>
+    <Arg Name="CUInvoiceNum" Value="" />
+  </Args>
+  <Response ACK="true" ACK_PLUS="true" />
+</Command>

@@ -1,0 +1,18 @@
+﻿<Command Name="ReadTCP_MACAddress" CmdByte="0x4E">
+  <FPOperation>Provides information about device's MAC address.</FPOperation>
+  <Args>
+    <Arg Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Arg Name="" Value="6" Type="OptionHardcoded" MaxLen="1" />
+    <ArgsFormatRaw><![CDATA[ <'R'><;><'T'><;><'6' > ]]></ArgsFormatRaw>
+  </Args>
+  <Response ACK="false">
+    <Res Name="" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="T" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="" Value="6" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="MACAddress" Value="" Type="Text" MaxLen="12">
+      <Desc>12 symbols for the device's MAC address</Desc>
+    </Res>
+    <ResFormatRaw><![CDATA[<'R'><;><'T'><;><'6'><;><MACAddress[12]>]]></ResFormatRaw>
+  </Response>
+</Command>

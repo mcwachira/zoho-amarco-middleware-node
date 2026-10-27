@@ -1,0 +1,20 @@
+﻿<Command Name="ReadHScode">
+  <Args>
+    <Arg Name="HS_Number" Value="" />
+  </Args>
+  <Response ACK="false">
+    <Res Name="Option" Value="Z" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="OptionR" Value="R" Type="OptionHardcoded" MaxLen="1" />
+    <Res Name="HS_Number" Value="" Type="Decimal_with_format" MaxLen="4" Format="0000" />
+    <Res Name="HS_Code" Value="" Type="Text" MaxLen="10" />
+    <Res Name="HS_Name" Value="" Type="Text" MaxLen="20" />
+    <Res Name="OptionTaxable" Value="" Type="Option" MaxLen="1">
+      <Options>
+        <Option Name="Exempted" Value="1" />
+        <Option Name="Taxable" Value="0" />
+      </Options>
+    </Res>
+    <Res Name="MesureUnit" Value="" Type="Text" MaxLen="3" />
+    <Res Name="VAT_Rate" Value="" Type="Decimal_with_format" MaxLen="6" Format="00.00" />
+  </Response>
+</Command>
