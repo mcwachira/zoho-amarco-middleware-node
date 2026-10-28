@@ -7,6 +7,7 @@ import type { ZohoInvoiceService } from "../../src/application/zoho/zoho-invoice
 import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-invoice-mapper.js";
 import type { FiscalCustomerProfileRepository } from "../../src/application/fiscalization/fiscal-customer-profile-repository.js";
 import type { FiscalItemProfileRepository } from "../../src/application/fiscalization/fiscal-item-profile-repository.js";
+import { DuplicateZohoInvoiceError } from "../../src/application/fiscalization/fiscalization-errors.js";
 
 const candidate: FiscalInvoiceCandidate = {
   zohoInvoiceId: "zoho-invoice-001",
@@ -118,6 +119,34 @@ describe("PrepareFiscalizationRequestService", () => {
     await service.findExisting(candidate.zohoInvoiceId);
 
     expect(registrationService.findExisting).toHaveBeenCalledWith(candidate.zohoInvoiceId);
+  });
+
+  it("returns an existing durable request without refetching Zoho", async () => {
+    const { service, invoiceService, registrationService } = createHarness();
+    registrationService.findExisting.mockResolvedValue(record);
+
+    await expect(service.synchronize(candidate.zohoInvoiceId)).resolves.toEqual({
+      kind: "registered",
+      record,
+      alreadyExisted: true,
+    });
+
+    expect(invoiceService.getFiscalInvoiceCandidate).not.toHaveBeenCalled();
+    expect(registrationService.register).not.toHaveBeenCalled();
+  });
+
+  it("returns the concurrently-created request after the unique key rejects a duplicate", async () => {
+    const { service, registrationService } = createHarness();
+    registrationService.register.mockRejectedValueOnce(
+      new DuplicateZohoInvoiceError(candidate.zohoInvoiceId),
+    );
+    registrationService.findExisting.mockResolvedValueOnce(null).mockResolvedValueOnce(record);
+
+    await expect(service.synchronize(candidate.zohoInvoiceId)).resolves.toEqual({
+      kind: "registered",
+      record,
+      alreadyExisted: true,
+    });
   });
 
   it("does not register an invoice that fails mapping", async () => {

@@ -6,7 +6,10 @@ import type { FiscalInvoiceCandidate } from "../../src/application/zoho/zoho-inv
 import { startFiscalization } from "../../src/domain/fiscalization/fiscalization-operations.js";
 import type { FiscalizationRecord } from "../../src/domain/fiscalization/fiscalization-record.js";
 import { makeFiscalizationSnapshot } from "./fiscalization-snapshot-fixture.js";
-import { DuplicateZohoInvoiceError } from "../../src/application/fiscalization/fiscalization-errors.js";
+import {
+  DuplicateZohoInvoiceError,
+  FiscalizationRequestPersistenceError,
+} from "../../src/application/fiscalization/fiscalization-errors.js";
 
 const invoice: FiscalInvoiceCandidate = {
   zohoInvoiceId: "zoho-invoice-001",
@@ -104,13 +107,15 @@ describe("RegisterFiscalizationRequestService", () => {
     expect(repository.saveOutcome).not.toHaveBeenCalled();
   });
 
-  it("propagates persistence errors without returning a registered record", async () => {
+  it("classifies persistence errors without returning database details", async () => {
     const { repository } = createRepository();
     repository.create.mockRejectedValue(new Error("Database unavailable"));
 
     const service = new RegisterFiscalizationRequestService(repository);
 
-    await expect(service.register(input)).rejects.toThrow("Database unavailable");
+    await expect(service.register(input)).rejects.toBeInstanceOf(
+      FiscalizationRequestPersistenceError,
+    );
     expect(repository.create).toHaveBeenCalledTimes(1);
     expect(repository.claimPending).not.toHaveBeenCalled();
   });

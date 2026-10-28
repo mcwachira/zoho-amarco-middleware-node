@@ -8,15 +8,39 @@ import {
   normalizeItemProfileData,
 } from "./fiscal-profile-validation.js";
 import type { FiscalInvoiceCandidate } from "../zoho/zoho-invoice-mapper.js";
+import type { ZohoPayment } from "../../integrations/zoho/books-client.js";
 import {
   FISCALIZATION_SNAPSHOT_VERSION,
   type FiscalizationSnapshot,
   type FiscalizationSnapshotCustomer,
   type FiscalizationSnapshotLineProfile,
+  type FiscalizationSnapshotPayment,
 } from "../../domain/fiscalization/fiscalization-snapshot.js";
 import { mapZohoInvoiceToTremolPlan } from "../../infrastructure/device/zoho-tremol-receipt-mapper.js";
 
+interface PaymentsClient {
+  getInvoicePayments(
+    invoiceId: string,
+    signal?: AbortSignal,
+    page?: number,
+  ): Promise<{ page: number; payments: readonly ZohoPayment[]; hasMore: boolean }>;
+}
+
+export type { PaymentsClient };
+
 const decimalString = z.string().regex(/^-?\d+(?:\.\d+)?$/);
+const MAX_FISCALIZATION_SNAPSHOT_SIZE = 1_000_000;
+
+function isValidInvoiceDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year!, month! - 1, day!));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month! - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
 
 const invoiceSchema = z
   .object({
@@ -39,10 +63,21 @@ const invoiceSchema = z
             taxName: z.string().nullable(),
             taxType: z.string().nullable(),
             taxPercentage: decimalString.nullable(),
+            discountAmount: decimalString.nullable().optional(),
           })
           .strict(),
       )
       .min(1),
+    invoiceDate: z
+      .string()
+      .refine(isValidInvoiceDate, "Must be a valid YYYY-MM-DD invoice date")
+      .nullable()
+      .optional(),
+    discount: z
+      .union([decimalString, z.string().regex(/^\d+(?:\.\d+)?%$/)])
+      .nullable()
+      .optional(),
+    discountBeforeTax: z.boolean().nullable().optional(),
     subtotal: decimalString,
     taxTotal: decimalString,
     total: decimalString,
@@ -74,6 +109,19 @@ const lineProfileSchema = z
   })
   .strict();
 
+const paymentSchema = z
+  .object({
+    paymentId: z.string().min(1),
+    paymentNumber: z.string().nullable(),
+    paymentMode: z.string().nullable(),
+    amount: decimalString,
+    date: z.string().nullable(),
+    referenceNumber: z.string().nullable(),
+    description: z.string().nullable(),
+    source: z.record(z.string(), z.unknown()).readonly(),
+  })
+  .strict();
+
 interface FiscalizationSnapshotPayload {
   readonly schemaVersion: typeof FISCALIZATION_SNAPSHOT_VERSION;
   readonly registeredAt: string;
@@ -81,6 +129,7 @@ interface FiscalizationSnapshotPayload {
   readonly invoice: FiscalInvoiceCandidate;
   readonly customer: FiscalizationSnapshotCustomer;
   readonly lineProfiles: readonly FiscalizationSnapshotLineProfile[];
+  readonly payments?: readonly FiscalizationSnapshotPayment[] | undefined;
 }
 
 export type FiscalizationSnapshotBuildResult =
@@ -118,6 +167,19 @@ function snapshotDigest(payload: FiscalizationSnapshotPayload): string {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
+function serializeSnapshot(value: unknown): string {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new FiscalizationSnapshotError("The stored fiscalization snapshot is not valid JSON.");
+  }
+  if (serialized === undefined) {
+    throw new FiscalizationSnapshotError("The stored fiscalization snapshot is not valid JSON.");
+  }
+  return serialized;
+}
+
 function freezeSnapshot<T>(value: T): T {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -137,7 +199,9 @@ export async function buildFiscalizationSnapshot(input: {
   readonly zohoOrganizationId: string;
   readonly customerProfiles: Pick<FiscalCustomerProfileRepository, "findByZohoCustomerId">;
   readonly itemProfiles: Pick<FiscalItemProfileRepository, "findByZohoItemId">;
+  readonly paymentsClient?: Pick<PaymentsClient, "getInvoicePayments">;
   readonly registeredAt?: Date;
+  readonly signal?: AbortSignal | undefined;
 }): Promise<FiscalizationSnapshotBuildResult> {
   const parsedInvoice = invoiceSchema.safeParse(input.invoice);
   if (!parsedInvoice.success) {
@@ -291,6 +355,63 @@ export async function buildFiscalizationSnapshot(input: {
     return validationError("registeredAt", "Registration timestamp must be valid.");
   }
 
+  const payments: FiscalizationSnapshotPayment[] = [];
+  if (input.paymentsClient && input.invoice.zohoInvoiceId) {
+    try {
+      const seenPaymentIds = new Set<string>();
+      let page = 1;
+      for (;;) {
+        input.signal?.throwIfAborted();
+        const result = await input.paymentsClient.getInvoicePayments(
+          input.invoice.zohoInvoiceId,
+          input.signal,
+          page,
+        );
+        input.signal?.throwIfAborted();
+        if (result.page !== page) {
+          return validationError("payments", "Payment retrieval returned an unexpected page.");
+        }
+        for (const payment of result.payments) {
+          if (seenPaymentIds.has(payment.paymentId)) {
+            return validationError("payments", "Payment retrieval returned a duplicate payment.");
+          }
+          seenPaymentIds.add(payment.paymentId);
+          payments.push({
+            paymentId: payment.paymentId,
+            paymentNumber: payment.paymentNumber,
+            paymentMode: payment.paymentMode,
+            amount: payment.amount,
+            date: payment.date,
+            referenceNumber: payment.referenceNumber,
+            description: payment.description,
+            // Retain a stable provenance digest without persisting the full
+            // untrusted provider object, which can contain unrelated personal
+            // or payment data.
+            source: {
+              responseSha256: createHash("sha256")
+                .update(JSON.stringify(payment.source))
+                .digest("hex"),
+            },
+          });
+        }
+        if (!result.hasMore) break;
+        if (page >= 100) {
+          return validationError(
+            "payments",
+            "Payment history exceeds the supported pagination limit.",
+          );
+        }
+        page += 1;
+      }
+    } catch {
+      if (input.signal?.aborted) throw input.signal.reason;
+      return validationError(
+        "payments",
+        "Zoho payment evidence could not be retrieved; the fiscalization request was not registered.",
+      );
+    }
+  }
+
   const payload: FiscalizationSnapshotPayload = {
     schemaVersion: FISCALIZATION_SNAPSHOT_VERSION,
     registeredAt: registeredAt.toISOString(),
@@ -298,6 +419,7 @@ export async function buildFiscalizationSnapshot(input: {
     invoice,
     customer,
     lineProfiles,
+    payments,
   };
 
   const snapshot = freezeSnapshot({
@@ -305,7 +427,7 @@ export async function buildFiscalizationSnapshot(input: {
     snapshotId: snapshotDigest(payload),
   });
 
-  if (JSON.stringify(snapshot).length > 1_000_000) {
+  if (serializeSnapshot(snapshot).length > MAX_FISCALIZATION_SNAPSHOT_SIZE) {
     return validationError(
       "snapshot",
       "Fiscalization snapshot exceeds the supported storage size.",
@@ -323,6 +445,12 @@ export function parseFiscalizationSnapshot(
     throw new FiscalizationSnapshotMissingError();
   }
 
+  if (serializeSnapshot(value).length > MAX_FISCALIZATION_SNAPSHOT_SIZE) {
+    throw new FiscalizationSnapshotError(
+      "The stored fiscalization snapshot exceeds the supported storage size.",
+    );
+  }
+
   const parsed = z
     .object({
       schemaVersion: z.number().int(),
@@ -332,6 +460,7 @@ export function parseFiscalizationSnapshot(
       invoice: invoiceSchema,
       customer: customerSchema,
       lineProfiles: z.array(lineProfileSchema).min(1),
+      payments: z.array(paymentSchema).optional(),
     })
     .strict()
     .safeParse(value);
@@ -376,6 +505,15 @@ export function parseFiscalizationSnapshot(
     )
   ) {
     throw new FiscalizationSnapshotError("The stored line profiles do not match the invoice.");
+  }
+
+  // Validate payments if present
+  if (parsed.data.payments) {
+    for (const payment of parsed.data.payments) {
+      if (payment.paymentId.trim() === "") {
+        throw new FiscalizationSnapshotError("A payment in the snapshot has no payment ID.");
+      }
+    }
   }
 
   const receiptPlanValidation = mapZohoInvoiceToTremolPlan({

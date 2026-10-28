@@ -1,5 +1,10 @@
 import { logger } from "../../observability/logger.js";
 import type { RecoverStaleFiscalizationsService } from "./recover-stale-fiscalizations.js";
+import {
+  operationalMetrics,
+  safelyBeginJobMetric,
+  type OperationalMetrics,
+} from "../../observability/operational-metrics.js";
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_STALE_AGE_MS = 30 * 60 * 1000;
@@ -9,6 +14,7 @@ interface StaleFiscalizationRecoveryWorkerOptions {
   intervalMs?: number;
   staleAgeMs?: number;
   now?: () => Date;
+  metrics?: OperationalMetrics;
 }
 
 function assertPositiveFiniteNumber(value: number, name: string): void {
@@ -29,6 +35,7 @@ export function startStaleFiscalizationRecoveryWorker({
   intervalMs = DEFAULT_INTERVAL_MS,
   staleAgeMs = DEFAULT_STALE_AGE_MS,
   now = () => new Date(),
+  metrics = operationalMetrics,
 }: StaleFiscalizationRecoveryWorkerOptions): {
   stop: () => Promise<void>;
 } {
@@ -54,6 +61,7 @@ export function startStaleFiscalizationRecoveryWorker({
   };
 
   const runRecovery = async (): Promise<void> => {
+    const finishMetric = safelyBeginJobMetric(metrics, "stale_recovery");
     try {
       const recoveryTime = now();
       const staleBefore = new Date(recoveryTime.getTime() - staleAgeMs);
@@ -70,7 +78,9 @@ export function startStaleFiscalizationRecoveryWorker({
           "Stale fiscalization requests marked OutcomeUnknown; reconciliation is required",
         );
       }
+      finishMetric(false);
     } catch {
+      finishMetric(true);
       logger.error("Stale fiscalization recovery run failed");
     } finally {
       inFlight = undefined;

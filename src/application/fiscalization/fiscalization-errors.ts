@@ -9,3 +9,11 @@ export class DuplicateZohoInvoiceError extends Error {
     this.name = "DuplicateZohoInvoiceError";
   }
 }
+
+/** The invoice was validated but could not be durably registered. */
+export class FiscalizationRequestPersistenceError extends Error {
+  constructor() {
+    super("Could not persist the fiscalization request.");
+    this.name = "FiscalizationRequestPersistenceError";
+  }
+}
