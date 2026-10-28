@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    env:
+      RUN_POSTGRES_INTEGRATION: "0"
+      RUN_POSTGRES_OAUTH_INTEGRATION: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production and development dependencies
+        run: pnpm audit:deps
+
+      - name: Generate PostgreSQL and SQL Server Prisma clients
+        run: pnpm db:generate
+
+      - name: Type-check application
+        run: pnpm typecheck
+
+      - name: Type-check tests
+        run: pnpm typecheck:tests
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run unit and configured tests
+        run: pnpm test
+
+      - name: Build production output
+        run: pnpm build
+
+      - name: Validate PostgreSQL and SQL Server schemas
+        run: pnpm db:validate
+
+      - name: Validate OpenAPI contract
+        run: pnpm run openapi:lint
