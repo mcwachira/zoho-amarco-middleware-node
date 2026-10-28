@@ -1,0 +1,28 @@
+{
+    "typeAcquisition": {
+       "enable": true
+    },
+    "compilerOptions": {
+        "target": "es3",
+        "module": "commonjs",
+        "isolatedModules": false,
+        // "allowJs": true,
+        // "checkJs": true, // auto check 
+        "allowSyntheticDefaultImports": true,
+        "baseUrl": ".",
+        "paths": {
+            "*": [
+                "*",
+                "./js/*",
+                "./js/FP/*"
+            ]
+        }
+    },
+    "include": [
+        "./**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/node_modules/*"
+    ]
+}
