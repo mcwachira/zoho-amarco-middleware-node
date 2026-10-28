@@ -80,4 +80,16 @@ export class PostgresqlFiscalItemProfileRepository implements FiscalItemProfileR
       throw error;
     }
   }
+
+  async delete(zohoItemId: string): Promise<void> {
+    const identity = normalizeItemIdentity(zohoItemId);
+    try {
+      await this.prisma.fiscalItemProfile.delete({ where: { zohoItemId: identity } });
+    } catch (error: unknown) {
+      if (isPrismaRecordNotFound(error)) {
+        throw new FiscalProfileNotFoundError("item");
+      }
+      throw error;
+    }
+  }
 }

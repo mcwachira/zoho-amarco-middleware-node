@@ -1,7 +1,16 @@
-import type { FiscalizationRepository } from "../../application/fiscalization/fiscalization-repository.js";
+import { randomUUID } from "node:crypto";
+import type {
+  FiscalizationHistoryQuery,
+  FiscalizationRepository,
+} from "../../application/fiscalization/fiscalization-repository.js";
 import type { FiscalizationRecord } from "../../domain/fiscalization/fiscalization-record.js";
-import { toDatabaseRecord, toDomainRecord } from "./fiscalization-record-mapper.js";
+import {
+  toDatabaseRecord,
+  toDomainAttempt,
+  toDomainRecord,
+} from "./fiscalization-record-mapper.js";
 import type { PrismaClient } from "../../generated/prisma/postgresql/client.js";
+import type { FiscalizationRecordWhereInput } from "../../generated/prisma/postgresql/models/FiscalizationRecord.js";
 import { DuplicateZohoInvoiceError } from "../../application/fiscalization/fiscalization-errors.js";
 
 /**
@@ -79,6 +88,61 @@ function isZohoInvoiceUniqueConstraintError(error: unknown): boolean {
 export class PostgresqlFiscalizationRepository implements FiscalizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async listHistory(query: FiscalizationHistoryQuery) {
+    const where: FiscalizationRecordWhereInput = {
+      ...((query.status ?? query.deviceOutcome)
+        ? { status: query.status ?? query.deviceOutcome }
+        : {}),
+      ...(query.createdFrom || query.createdTo
+        ? {
+            createdAt: {
+              ...(query.createdFrom ? { gte: query.createdFrom } : {}),
+              ...(query.createdTo ? { lte: query.createdTo } : {}),
+            },
+          }
+        : {}),
+      ...(query.etimsStatus || query.correlationId
+        ? {
+            etimsReportingOperation: {
+              is: {
+                ...(query.etimsStatus ? { status: query.etimsStatus } : {}),
+                ...(query.correlationId ? { correlationId: query.correlationId } : {}),
+              },
+            },
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.fiscalizationRecord.findMany({
+        where,
+        include: {
+          deviceAttempts: {
+            orderBy: { attemptNumber: "asc" },
+            select: { attemptNumber: true, outcome: true, errorCode: true },
+          },
+          etimsReportingOperation: { select: { status: true, correlationId: true } },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.fiscalizationRecord.count({ where }),
+    ]);
+    const records = rows.map(toDomainRecord);
+    const summaries = rows.map((row, index) => ({
+      id: records[index]!.id,
+      zohoInvoiceId: records[index]!.zohoInvoiceId,
+      status: records[index]!.status,
+      createdAt: records[index]!.createdAt,
+      updatedAt: records[index]!.updatedAt,
+      failureCode: row.failureCode,
+      etimsStatus: row.etimsReportingOperation?.status ?? null,
+      correlationId: row.etimsReportingOperation?.correlationId ?? null,
+      deviceAttempts: row.deviceAttempts,
+    }));
+    return { records, total, summaries };
+  }
+
   async findById(id: string): Promise<FiscalizationRecord | null> {
     const row = await this.prisma.fiscalizationRecord.findUnique({
       where: { id },
@@ -93,6 +157,14 @@ export class PostgresqlFiscalizationRepository implements FiscalizationRepositor
     });
 
     return row === null ? null : toDomainRecord(row);
+  }
+
+  async findAttemptsByRequestId(id: string) {
+    const rows = await this.prisma.fiscalizationAttempt.findMany({
+      where: { fiscalizationRequestId: id },
+      orderBy: { attemptNumber: "asc" },
+    });
+    return rows.map(toDomainAttempt);
   }
 
   async create(record: FiscalizationRecord): Promise<void> {
@@ -110,55 +182,68 @@ export class PostgresqlFiscalizationRepository implements FiscalizationRepositor
   }
 
   async claimPending(id: string): Promise<FiscalizationRecord | null> {
-    // Compare-and-set: only one worker can change Pending to InProgress.
-    const result = await this.prisma.fiscalizationRecord.updateMany({
-      where: {
-        id,
-        status: "Pending",
-      },
-      data: {
-        status: "InProgress",
-        updatedAt: new Date(),
-      },
+    const now = new Date();
+    return this.prisma.$transaction(async (transaction) => {
+      // The claim and its durable attempt record commit together. The
+      // transaction ends before any caller can contact the device.
+      const result = await transaction.fiscalizationRecord.updateMany({
+        where: { id, status: "Pending" },
+        data: { status: "InProgress", updatedAt: now },
+      });
+      if (result.count !== 1) return null;
+      const row = await transaction.fiscalizationRecord.findUnique({ where: { id } });
+      if (!row) throw new Error("Claimed fiscalization request disappeared.");
+      await transaction.fiscalizationAttempt.create({
+        data: {
+          id: randomUUID(),
+          fiscalizationRequestId: id,
+          attemptNumber: 1,
+          startedAt: now,
+        },
+      });
+      return toDomainRecord(row);
     });
-
-    if (result.count !== 1) {
-      return null;
-    }
-
-    // Read the record only after successfully claiming it.
-    const row = await this.prisma.fiscalizationRecord.findUnique({
-      where: { id },
-    });
-
-    if (row === null) {
-      return null;
-    }
-
-    return toDomainRecord(row);
   }
 
   async saveOutcome(record: FiscalizationRecord): Promise<boolean> {
     const databaseRecord = toDatabaseRecord(record);
 
-    // Persist the outcome only if this record is still InProgress.
-    const result = await this.prisma.fiscalizationRecord.updateMany({
-      where: {
-        id: record.id,
-        status: "InProgress",
-      },
-      data: {
-        status: databaseRecord.status,
-        receiptNumber: databaseRecord.receiptNumber,
-        issuedAt: databaseRecord.issuedAt,
-        failureCode: databaseRecord.failureCode,
-        failureMessage: databaseRecord.failureMessage,
-        outcomeUnknownReason: databaseRecord.outcomeUnknownReason,
-        updatedAt: new Date(),
-      },
+    const now = new Date();
+    return this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.fiscalizationRecord.updateMany({
+        where: { id: record.id, status: "InProgress" },
+        data: {
+          status: databaseRecord.status,
+          receiptNumber: databaseRecord.receiptNumber,
+          issuedAt: databaseRecord.issuedAt,
+          failureCode: databaseRecord.failureCode,
+          failureMessage: databaseRecord.failureMessage,
+          outcomeUnknownReason: databaseRecord.outcomeUnknownReason,
+          updatedAt: now,
+        },
+      });
+      if (result.count !== 1) return false;
+      const attemptResult = await transaction.fiscalizationAttempt.updateMany({
+        where: { fiscalizationRequestId: record.id, completedAt: null },
+        data: {
+          completedAt: now,
+          outcome:
+            record.status === "Succeeded"
+              ? "succeeded"
+              : record.status === "Failed"
+                ? "failed"
+                : "outcome_unknown",
+          receiptNumber: databaseRecord.receiptNumber,
+          issuedAt: databaseRecord.issuedAt,
+          errorCode: databaseRecord.failureCode,
+          errorMessage: databaseRecord.failureMessage ?? databaseRecord.outcomeUnknownReason,
+        },
+      });
+      if (attemptResult.count !== 1) {
+        throw new Error("Claimed fiscalization attempt could not be completed.");
+      }
+      return true;
     });
-
-    return result.count === 1;
   }
 
   async markStaleInProgressOutcomeUnknown(staleBefore: Date, reason: string): Promise<number> {
@@ -171,26 +256,43 @@ export class PostgresqlFiscalizationRepository implements FiscalizationRepositor
       throw new Error("Recovery reason must not exceed 2000 characters.");
     }
 
-    // Atomically recover only records that are still InProgress
-    // and whose last update occurred before the cutoff.
-    const result = await this.prisma.fiscalizationRecord.updateMany({
-      where: {
-        status: "InProgress",
-        updatedAt: {
-          lt: staleBefore,
-        },
-      },
-      data: {
-        status: "OutcomeUnknown",
-        receiptNumber: null,
-        issuedAt: null,
-        failureCode: null,
-        failureMessage: null,
-        outcomeUnknownReason: reason,
-        updatedAt: new Date(),
-      },
+    const stale = await this.prisma.fiscalizationRecord.findMany({
+      where: { status: "InProgress", updatedAt: { lt: staleBefore } },
+      select: { id: true },
     });
-
-    return result.count;
+    let recovered = 0;
+    const now = new Date();
+    for (const candidate of stale) {
+      const changed = await this.prisma.$transaction(async (transaction) => {
+        const result = await transaction.fiscalizationRecord.updateMany({
+          where: { id: candidate.id, status: "InProgress", updatedAt: { lt: staleBefore } },
+          data: {
+            status: "OutcomeUnknown",
+            receiptNumber: null,
+            issuedAt: null,
+            failureCode: null,
+            failureMessage: null,
+            outcomeUnknownReason: reason,
+            updatedAt: now,
+          },
+        });
+        if (result.count !== 1) return false;
+        const attempt = await transaction.fiscalizationAttempt.updateMany({
+          where: { fiscalizationRequestId: candidate.id, completedAt: null },
+          data: {
+            completedAt: now,
+            outcome: "outcome_unknown",
+            errorCode: "stale_operation_recovered",
+            errorMessage: reason,
+          },
+        });
+        if (attempt.count !== 1) {
+          throw new Error("Stale fiscalization request has no active durable attempt.");
+        }
+        return true;
+      });
+      if (changed) recovered += 1;
+    }
+    return recovered;
   }
 }
