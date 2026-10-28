@@ -18,7 +18,7 @@ describe("TremolZfpLabServerClient", () => {
         new TremolZfpLabServerClient({
           baseUrl: "ftp://localhost:4444",
         }),
-    ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
+    ).toThrow("ZFPLabServer URL must be an HTTP(S) origin");
   });
 
   it("rejects URLs containing credentials", () => {
@@ -27,18 +27,29 @@ describe("TremolZfpLabServerClient", () => {
         new TremolZfpLabServerClient({
           baseUrl: "http://user:password@localhost:4444",
         }),
-    ).toThrow("A valid HTTP(S) ZFPLabServer URL is required.");
+    ).toThrow("ZFPLabServer URL must be an HTTP(S) origin");
   });
 
-  it("rejects a zero or negative timeout", () => {
-    for (const timeoutMs of [0, -1]) {
+  it("rejects non-origin URLs and query data", () => {
+    for (const baseUrl of ["http://localhost:4444/path", "http://localhost:4444?x=1"]) {
+      expect(
+        () =>
+          new TremolZfpLabServerClient({
+            baseUrl,
+          }),
+      ).toThrow("ZFPLabServer URL must be an HTTP(S) origin");
+    }
+  });
+
+  it("requires a bounded positive timeout", () => {
+    for (const timeoutMs of [0, 99, 120_001]) {
       expect(
         () =>
           new TremolZfpLabServerClient({
             baseUrl: "http://localhost:4444",
             timeoutMs,
           }),
-      ).toThrow("timeoutMs must be a positive integer.");
+      ).toThrow("timeoutMs must be an integer between 100 and 120000 milliseconds.");
     }
   });
 
@@ -67,6 +78,72 @@ describe("TremolZfpLabServerClient", () => {
     });
   });
 
+  it.each([
+    "ReadStatus()",
+    "ReadVersion()",
+    "ReadCurrentReceiptInfo()",
+    "ReadLastAndTotalReceiptNum()",
+  ] as const)("uses the documented direct GET path for %s", async (command) => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('<Res Code="0"></Res>', { status: 200 }));
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    await client.executeRead(command);
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0]?.[0]).toEqual(new URL(`http://localhost:4444/${command}`));
+    const requestOptions = fetchImpl.mock.calls[0]?.[1];
+    expect(requestOptions?.method).toBe("GET");
+    expect(requestOptions).not.toHaveProperty("body");
+  });
+
+  it("rejects commands outside the read-only allow-list before transmission", async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    await expect(client.executeRead("CloseReceipt()" as never)).rejects.toBeInstanceOf(
+      TremolProtocolError,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("does not retry a transport failure whose transmission status is unknown", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError("network failure"));
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    await expect(client.executeRead("ReadVersion()")).rejects.toMatchObject({
+      name: "TremolTransportError",
+      kind: "outcome-unknown",
+      reason: "network_error",
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it("stops transport activity when closed", async () => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    const client = new TremolZfpLabServerClient({
+      baseUrl: "http://localhost:4444",
+      fetchImpl,
+    });
+
+    await client.close();
+    await expect(client.executeRead("ReadVersion()")).rejects.toMatchObject({
+      name: "TremolTransportError",
+      reason: "closed",
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("rejects non-successful HTTP responses", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
@@ -80,7 +157,7 @@ describe("TremolZfpLabServerClient", () => {
     await expect(client.executeRead("ReadVersion()")).rejects.toBeInstanceOf(TremolHttpError);
   });
 
-  it("preserves HTTP error status and response body", async () => {
+  it("preserves HTTP status without retaining a possibly sensitive response body", async () => {
     const responseBody = "ZFPLabServer unavailable";
 
     const fetchImpl = vi
@@ -95,7 +172,6 @@ describe("TremolZfpLabServerClient", () => {
     await expect(client.executeRead("ReadStatus()")).rejects.toMatchObject({
       name: "TremolHttpError",
       status: 503,
-      responseBody,
     });
   });
 
@@ -164,15 +240,14 @@ describe("TremolZfpLabServerClient", () => {
     await expect(client.executeRead("ReadStatus()")).rejects.toMatchObject({
       name: "TremolDeviceError",
       resultCode: 40,
-      responseBody: errorXml,
     });
   });
 
-  it("preserves the complete XML diagnostics for device errors", async () => {
+  it("normalizes device errors without retaining the provider message or XML body", async () => {
     const errorXml =
       '<Res Code="40">' +
       '<Err Type="FPException" STE1="30" STE2="34" FPLibErrorCode="04">' +
-      "<Message>Command syntax error</Message>" +
+      "<Message>SENSITIVE_DEVICE_DETAIL</Message>" +
       "</Err></Res>";
 
     const fetchImpl = vi
@@ -184,16 +259,17 @@ describe("TremolZfpLabServerClient", () => {
       fetchImpl,
     });
 
-    try {
-      await client.executeRead("ReadStatus()");
-      throw new Error("Expected the device command to fail.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(TremolDeviceError);
-      expect(error).toMatchObject({
-        resultCode: 40,
-        responseBody: errorXml,
-      });
-    }
+    const error = await client.executeRead("ReadStatus()").then(
+      () => {
+        throw new Error("Expected the device command to fail.");
+      },
+      (reason: unknown) => reason,
+    );
+
+    expect(error).toBeInstanceOf(TremolDeviceError);
+    expect(error).toMatchObject({ resultCode: 40 });
+    expect((error as Error).message).not.toContain("SENSITIVE_DEVICE_DETAIL");
+    expect(JSON.stringify(error)).not.toContain(errorXml);
   });
 
   it("rejects a response without the XML result envelope expected by the parser", async () => {
@@ -295,12 +371,14 @@ describe("TremolZfpLabServerClient", () => {
 
     const client = new TremolZfpLabServerClient({
       baseUrl: "http://localhost:4444",
-      timeoutMs: 20,
+      timeoutMs: 100,
       fetchImpl,
     });
 
     await expect(client.executeRead("ReadStatus()")).rejects.toMatchObject({
-      name: "TimeoutError",
+      name: "TremolTransportError",
+      kind: "outcome-unknown",
+      reason: "timeout",
     });
 
     const result = await client.executeRead("ReadVersion()");
@@ -309,16 +387,11 @@ describe("TremolZfpLabServerClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps ReadStatus flags and readiness unknown without a documented XML mapping", async () => {
+  it("maps supplied ReadStatus fields and keeps readiness unknown", async () => {
     const body =
       '<Res Code="0">' +
-      '<Res Name="ST0" Value="218" Type="Decimal"/>' +
-      '<Res Name="ST1" Value="130" Type="Decimal"/>' +
-      '<Res Name="ST2" Value="230" Type="Decimal"/>' +
-      '<Res Name="ST3" Value="224" Type="Decimal"/>' +
-      '<Res Name="ST4" Value="135" Type="Decimal"/>' +
-      '<Res Name="ST5" Value="255" Type="Decimal"/>' +
-      '<Res Name="Power_down_in_opened_fiscal_receipt" Value="true" Type="Boolean"/>' +
+      '<Res Name="Opened_Fiscal_Receipt" Value="1" Type="Status"/>' +
+      '<Res Name="CU_fiscalized" Value="0" Type="Status"/>' +
       "</Res>";
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { status: 200 }));
     const client = new TremolZfpLabServerClient({
@@ -337,11 +410,11 @@ describe("TremolZfpLabServerClient", () => {
       ramReset: null,
       hardwareClockError: null,
       registersOverflow: null,
-      fiscalReceiptOpened: null,
+      fiscalReceiptOpened: true,
       receiptInvoiceType: null,
       sdCardNearFull: null,
       sdCardFull: null,
-      cuFiscalized: null,
+      cuFiscalized: false,
       cuProduced: null,
       pairedWithTims: null,
       unsentReceipts: null,
