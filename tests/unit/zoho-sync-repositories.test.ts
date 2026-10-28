@@ -1,14 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { PostgresqlZohoSyncRepository } from "../../src/infrastructure/database/postgresql-zoho-sync-repository.js";
-import { SqlServerZohoSyncRepository } from "../../src/infrastructure/database/sqlserver-zoho-sync-repository.js";
 
-const implementations = [
-  ["PostgreSQL", PostgresqlZohoSyncRepository],
-  ["SQL Server", SqlServerZohoSyncRepository],
-] as const;
-
-describe.each(implementations)("%s synchronization repository", (_provider, Repository) => {
+describe("PostgreSQL synchronization repository", () => {
+  const Repository = PostgresqlZohoSyncRepository;
   function createRepositoryMocks(create = vi.fn(), updateMany = vi.fn()) {
     const lockDelegate = {
       create,

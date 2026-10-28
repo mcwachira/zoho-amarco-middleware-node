@@ -13,6 +13,7 @@ const ALLOWED_ZOHO_BOOKS_API_HOSTS = new Set([
   "www.zohoapis.ca",
   "www.zohoapis.com.cn",
   "www.zohoapis.sa",
+  "www.zohoapis.ae",
 ]);
 
 /**

@@ -48,6 +48,24 @@ function page(pageNumber: number, invoiceIds: readonly string[], hasMore: boolea
 }
 
 describe("ImportZohoInvoicesService", () => {
+  it("enforces bounded configurable pagination limits", () => {
+    const booksClient = { listInvoicesPage: vi.fn() } as unknown as Pick<
+      ZohoBooksClient,
+      "listInvoicesPage"
+    >;
+    const prepare = { findExisting: vi.fn(), prepare: vi.fn() } as unknown as Pick<
+      PrepareFiscalizationRequestService,
+      "findExisting" | "prepare"
+    >;
+
+    expect(() => new ImportZohoInvoicesService(booksClient, prepare, { pageSize: 201 })).toThrow(
+      "Invoice import page size must be between 1 and 200.",
+    );
+    expect(() => new ImportZohoInvoicesService(booksClient, prepare, { maxPages: 1_001 })).toThrow(
+      "Invoice import maximum pages must be between 1 and 1000.",
+    );
+  });
+
   it("retrieves and registers invoices from every page", async () => {
     const { service, listInvoicesPage, prepare } = createHarness([
       page(1, ["invoice-1", "invoice-2"], true),

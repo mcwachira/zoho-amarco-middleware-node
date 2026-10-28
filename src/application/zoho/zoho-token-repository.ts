@@ -50,6 +50,15 @@ export interface ZohoTokenRepository {
    */
   save(tokens: SaveZohoTokens): Promise<void>;
 
+  /** Atomically claims the singleton token row until the supplied expiry. */
+  tryAcquireRefreshLease(leaseToken: string, now: Date, expiresAt: Date): Promise<boolean>;
+
+  /** Persists refreshed credentials only while this caller still owns the lease. */
+  saveRefreshedTokens(leaseToken: string, now: Date, tokens: SaveZohoTokens): Promise<boolean>;
+
+  /** Releases a lease only when the caller still owns it. */
+  releaseRefreshLease(leaseToken: string): Promise<void>;
+
   /** Returns the stored token set, or null if no connection exists. */
   get(): Promise<StoredZohoTokens | null>;
 }

@@ -290,4 +290,39 @@ describe("ZohoInvoiceSynchronizationService", () => {
       run: { errorCode: "SYNCHRONIZATION_LOCK_LOST", paginationComplete: false },
     });
   });
+
+  it("records caller cancellation as a failed run and releases the lease", async () => {
+    const { repository, locks, runs } = createRepository();
+    let importerSignal: AbortSignal | undefined;
+    const importer = vi.fn(
+      (signal?: AbortSignal) =>
+        new Promise<ZohoInvoiceImportResult>((resolve) => {
+          importerSignal = signal;
+          signal?.addEventListener(
+            "abort",
+            () =>
+              resolve({
+                ...successImport(),
+                state: "partial",
+                paginationComplete: false,
+                issues: [{ category: "synchronization_cancelled" }],
+              }),
+            { once: true },
+          );
+        }),
+    );
+    const service = makeService("organization-a", repository, importer);
+    const controller = new AbortController();
+
+    const run = service.execute(controller.signal);
+    await vi.waitFor(() => expect(importerSignal).toBeDefined());
+    controller.abort();
+
+    await expect(run).resolves.toMatchObject({
+      state: "failed",
+      run: { errorCode: "SYNCHRONIZATION_CANCELLED", paginationComplete: false },
+    });
+    expect(locks.get("organization-a")?.leaseExpiresAt.getTime()).toBeLessThanOrEqual(Date.now());
+    expect([...runs.values()][0]?.status).toBe("Failed");
+  });
 });

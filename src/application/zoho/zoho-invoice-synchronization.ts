@@ -68,7 +68,7 @@ export class ZohoInvoiceSynchronizationService {
     };
   }
 
-  async execute(): Promise<ZohoInvoiceSynchronizationResult> {
+  async execute(signal?: AbortSignal): Promise<ZohoInvoiceSynchronizationResult> {
     const now = this.options.now ?? (() => new Date());
     const generateId = this.options.generateId ?? randomUUID;
     const leaseMs = this.options.leaseMs ?? DEFAULT_LEASE_MS;
@@ -103,6 +103,12 @@ export class ZohoInvoiceSynchronizationService {
     }
 
     const abortController = new AbortController();
+    const abortFromCaller = (): void => abortController.abort();
+    if (signal?.aborted) {
+      abortController.abort();
+    } else {
+      signal?.addEventListener("abort", abortFromCaller, { once: true });
+    }
     let lockLost = false;
     let heartbeatRunning = false;
     let heartbeatPromise: Promise<void> | undefined;
@@ -132,7 +138,9 @@ export class ZohoInvoiceSynchronizationService {
       const imported = await this.importer.execute(abortController.signal);
       const interrupted = lockLost || abortController.signal.aborted;
       const errorCode = interrupted
-        ? "SYNCHRONIZATION_LOCK_LOST"
+        ? lockLost
+          ? "SYNCHRONIZATION_LOCK_LOST"
+          : "SYNCHRONIZATION_CANCELLED"
         : (imported.issues[0]?.code ?? imported.issues[0]?.category ?? null);
       completion = {
         status:
@@ -166,6 +174,7 @@ export class ZohoInvoiceSynchronizationService {
       };
     } finally {
       clearInterval(heartbeat);
+      signal?.removeEventListener("abort", abortFromCaller);
       await heartbeatPromise;
     }
 

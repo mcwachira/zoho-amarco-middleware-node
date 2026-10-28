@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import type { ZohoOAuthAttemptRepository } from "./oauth-attempt-repository.js";
 import { buildZohoAuthorizationUrl } from "../../integrations/zoho/authorization-url.js";
@@ -20,6 +20,9 @@ import {
 
 /** Authorization attempts expire after ten minutes. */
 const OAUTH_ATTEMPT_TTL_MS = 10 * 60 * 1000;
+const TOKEN_REFRESH_LEASE_MS = 30_000;
+const TOKEN_REFRESH_WAIT_MS = 35_000;
+const TOKEN_REFRESH_POLL_MS = 100;
 
 export type ZohoTokenExchange = (
   options: ZohoTokenExchangeOptions,
@@ -40,6 +43,8 @@ export interface ZohoOAuthServiceOptions {
   tokenRepository: ZohoTokenRepository;
   tokenExchange?: ZohoTokenExchange;
   tokenRefresh?: ZohoTokenRefresh;
+  sleep?: (milliseconds: number) => Promise<void>;
+  scopes?: readonly ("ZohoBooks.invoices.READ" | "ZohoBooks.invoices.UPDATE")[];
 }
 
 export interface ZohoOAuthStartResult {
@@ -57,12 +62,14 @@ export class ZohoOAuthService {
   private readonly clientId: string;
   private readonly redirectUri: string;
   private readonly accountsUrl: string;
+  private readonly scopes: readonly ("ZohoBooks.invoices.READ" | "ZohoBooks.invoices.UPDATE")[];
   private readonly encryptionKey: string | undefined;
   private readonly clientSecret: string;
   private readonly tokenRepository: ZohoTokenRepository;
   private readonly tokenExchange: ZohoTokenExchange;
   private readonly now: () => Date;
   private readonly tokenRefresh: ZohoTokenRefresh;
+  private readonly sleep: (milliseconds: number) => Promise<void>;
 
   private refreshInFlight: Promise<{
     accessToken: string;
@@ -75,11 +82,15 @@ export class ZohoOAuthService {
     this.clientId = options.clientId;
     this.redirectUri = options.redirectUri;
     this.accountsUrl = options.accountsUrl;
+    this.scopes = options.scopes ?? ["ZohoBooks.invoices.READ"];
     this.encryptionKey = options.encryptionKey;
     this.clientSecret = options.clientSecret;
     this.tokenRepository = options.tokenRepository;
     this.tokenExchange = options.tokenExchange ?? exchangeZohoAuthorizationCode;
     this.tokenRefresh = options.tokenRefresh ?? refreshZohoAccessToken;
+    this.sleep =
+      options.sleep ??
+      ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.now = options.now ?? (() => new Date());
   }
 
@@ -115,6 +126,7 @@ export class ZohoOAuthService {
       redirectUri: this.redirectUri,
       state,
       codeChallenge: pkce.challenge,
+      scopes: this.scopes,
     });
 
     return { authorizationUrl: authorizationUrl.toString() };
@@ -195,7 +207,7 @@ export class ZohoOAuthService {
       return this.refreshInFlight;
     }
 
-    const refreshPromise = this.refreshStoredTokens(stored, encryptionKey);
+    const refreshPromise = this.refreshStoredTokens(encryptionKey);
     this.refreshInFlight = refreshPromise;
 
     try {
@@ -210,51 +222,93 @@ export class ZohoOAuthService {
   /**
    * Exchanges the stored refresh token and persists the new access token.
    */
-  private async refreshStoredTokens(
-    stored: NonNullable<Awaited<ReturnType<ZohoTokenRepository["get"]>>>,
-    encryptionKey: string,
-  ): Promise<{
+  private async refreshStoredTokens(encryptionKey: string): Promise<{
     accessToken: string;
     apiDomain: string;
     scopes: string;
   }> {
-    if (!stored.encryptedRefreshToken) {
-      throw new Error(
-        "Zoho access token has expired or is expiring, but no refresh token is stored. Reauthorize Zoho.",
+    const leaseToken = randomUUID();
+    const waitDeadline = Date.now() + TOKEN_REFRESH_WAIT_MS;
+    let acquired = false;
+
+    while (!acquired) {
+      const now = this.now();
+      acquired = await this.tokenRepository.tryAcquireRefreshLease(
+        leaseToken,
+        now,
+        new Date(now.getTime() + TOKEN_REFRESH_LEASE_MS),
       );
+      if (acquired) break;
+
+      const current = await this.tokenRepository.get();
+      if (!current) throw new Error("Zoho is not connected.");
+      if (this.isAccessTokenFresh(current))
+        return this.decryptStoredAccessToken(current, encryptionKey);
+      if (Date.now() >= waitDeadline) {
+        throw new Error(
+          "Zoho token refresh is already in progress; retry the API request shortly.",
+        );
+      }
+      await this.sleep(TOKEN_REFRESH_POLL_MS);
     }
 
-    const refreshToken = decryptSecret(stored.encryptedRefreshToken, encryptionKey);
+    let savedByThisLease = false;
+    try {
+      // A prior lease holder may have completed between our initial read and
+      // this claim. Always use the newest token row before contacting Zoho.
+      const current = await this.tokenRepository.get();
+      if (!current) throw new Error("Zoho is not connected.");
+      if (this.isAccessTokenFresh(current))
+        return this.decryptStoredAccessToken(current, encryptionKey);
+      if (!current.encryptedRefreshToken) {
+        throw new Error(
+          "Zoho access token has expired or is expiring, but no refresh token is stored. Reauthorize Zoho.",
+        );
+      }
 
-    const tokens = await this.tokenRefresh({
-      accountsUrl: this.accountsUrl,
-      clientId: this.clientId,
-      clientSecret: this.clientSecret,
-      refreshToken,
-    });
+      const tokens = await this.tokenRefresh({
+        accountsUrl: this.accountsUrl,
+        clientId: this.clientId,
+        clientSecret: this.clientSecret,
+        refreshToken: decryptSecret(current.encryptedRefreshToken, encryptionKey),
+      });
+      const scopes = tokens.scopes ?? current.scopes;
+      const saved = await this.tokenRepository.saveRefreshedTokens(leaseToken, this.now(), {
+        encryptedAccessToken: encryptSecret(tokens.accessToken, encryptionKey),
+        ...(tokens.refreshToken
+          ? { encryptedRefreshToken: encryptSecret(tokens.refreshToken, encryptionKey) }
+          : {}),
+        accessTokenExpiresAt: new Date(this.now().getTime() + tokens.expiresIn * 1000),
+        apiDomain: tokens.apiDomain,
+        scopes,
+      });
+      if (!saved) {
+        const latest = await this.tokenRepository.get();
+        if (latest && this.isAccessTokenFresh(latest)) {
+          return this.decryptStoredAccessToken(latest, encryptionKey);
+        }
+        throw new Error("Zoho token refresh lease was lost before credentials could be saved.");
+      }
 
-    const scopes = tokens.scopes ?? stored.scopes;
+      savedByThisLease = true;
+      return { accessToken: tokens.accessToken, apiDomain: tokens.apiDomain, scopes };
+    } finally {
+      if (!savedByThisLease) await this.tokenRepository.releaseRefreshLease(leaseToken);
+    }
+  }
 
-    const encryptedAccessToken = encryptSecret(tokens.accessToken, encryptionKey);
+  private isAccessTokenFresh(stored: NonNullable<Awaited<ReturnType<ZohoTokenRepository["get"]>>>) {
+    return stored.accessTokenExpiresAt.getTime() - 60_000 > this.now().getTime();
+  }
 
-    const encryptedRefreshToken = tokens.refreshToken
-      ? encryptSecret(tokens.refreshToken, encryptionKey)
-      : undefined;
-
-    const accessTokenExpiresAt = new Date(this.now().getTime() + tokens.expiresIn * 1000);
-
-    await this.tokenRepository.save({
-      encryptedAccessToken,
-      ...(encryptedRefreshToken ? { encryptedRefreshToken } : {}),
-      accessTokenExpiresAt,
-      apiDomain: tokens.apiDomain,
-      scopes,
-    });
-
+  private decryptStoredAccessToken(
+    stored: NonNullable<Awaited<ReturnType<ZohoTokenRepository["get"]>>>,
+    encryptionKey: string,
+  ) {
     return {
-      accessToken: tokens.accessToken,
-      apiDomain: tokens.apiDomain,
-      scopes,
+      accessToken: decryptSecret(stored.encryptedAccessToken, encryptionKey),
+      apiDomain: stored.apiDomain,
+      scopes: stored.scopes,
     };
   }
 
