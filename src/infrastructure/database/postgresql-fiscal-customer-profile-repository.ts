@@ -84,4 +84,16 @@ export class PostgresqlFiscalCustomerProfileRepository implements FiscalCustomer
       throw error;
     }
   }
+
+  async delete(zohoCustomerId: string): Promise<void> {
+    const identity = normalizeCustomerIdentity(zohoCustomerId);
+    try {
+      await this.prisma.fiscalCustomerProfile.delete({ where: { zohoCustomerId: identity } });
+    } catch (error: unknown) {
+      if (isPrismaRecordNotFound(error)) {
+        throw new FiscalProfileNotFoundError("customer");
+      }
+      throw error;
+    }
+  }
 }

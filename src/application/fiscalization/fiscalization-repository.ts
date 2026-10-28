@@ -1,12 +1,51 @@
-import type { FiscalizationRecord } from "../../domain/fiscalization/fiscalization-record.js";
+import type {
+  FiscalizationAttempt,
+  FiscalizationRecord,
+} from "../../domain/fiscalization/fiscalization-record.js";
+
+export interface FiscalizationHistoryQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly status?: string;
+  readonly deviceOutcome?: string;
+  readonly createdFrom?: Date;
+  readonly createdTo?: Date;
+  readonly etimsStatus?: string;
+  readonly correlationId?: string;
+}
+
+export interface FiscalizationHistoryPage {
+  readonly records: readonly FiscalizationRecord[];
+  readonly total: number;
+  readonly summaries?: readonly FiscalizationHistorySummary[];
+}
+
+export interface FiscalizationHistorySummary {
+  readonly id: string;
+  readonly zohoInvoiceId: string;
+  readonly status: FiscalizationRecord["status"];
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  readonly failureCode: string | null;
+  readonly etimsStatus: string | null;
+  readonly correlationId: string | null;
+  readonly deviceAttempts: readonly {
+    readonly attemptNumber: number;
+    readonly outcome: string | null;
+    readonly errorCode: string | null;
+  }[];
+}
 
 /**
  * Describes how the application interacts with stored fiscalization records.
  *
  * This is an interface, not a database implementation. Later, Prisma will
- * implement it for PostgreSQL or SQL Server without changing the service.
+ * implement it for PostgreSQL without changing the service.
  */
 export interface FiscalizationRepository {
+  listHistory?(query: FiscalizationHistoryQuery): Promise<FiscalizationHistoryPage>;
+  /** Returns persisted, sanitized device operation history when supported. */
+  findAttemptsByRequestId?(id: string): Promise<readonly FiscalizationAttempt[]>;
   /**
    * Finds a fiscalization record by our internal ID.
    *

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
+import { requirePermission } from "../middleware/api-authorization.js";
 
 import type { FiscalCustomerProfileRepository } from "../application/fiscalization/fiscal-customer-profile-repository.js";
 import type { FiscalItemProfileRepository } from "../application/fiscalization/fiscal-item-profile-repository.js";
@@ -97,6 +98,8 @@ function handleProfileError(req: Request, res: Response, error: unknown): void {
 
 export function createFiscalProfileRouter(dependencies: FiscalProfileRouteDependencies): Router {
   const router = Router();
+  router.use("/fiscal-customer-profiles", requirePermission("profile:manage"));
+  router.use("/fiscal-item-profiles", requirePermission("profile:manage"));
 
   router.post("/fiscal-customer-profiles", async (req, res) => {
     if (!dependencies.customerRepository) {
@@ -195,6 +198,28 @@ export function createFiscalProfileRouter(dependencies: FiscalProfileRouteDepend
     }
   });
 
+  router.delete("/fiscal-customer-profiles/:zohoCustomerId", async (req, res) => {
+    if (!dependencies.customerRepository) {
+      res.status(503).json({
+        error: {
+          code: "FISCAL_PROFILE_REPOSITORY_UNAVAILABLE",
+          message: "Fiscal customer profile management is not configured.",
+        },
+      });
+      return;
+    }
+
+    const zohoCustomerId =
+      typeof req.params["zohoCustomerId"] === "string" ? req.params["zohoCustomerId"] : "";
+
+    try {
+      await dependencies.customerRepository.delete(zohoCustomerId);
+      res.status(204).end();
+    } catch (error: unknown) {
+      handleProfileError(req, res, error);
+    }
+  });
+
   router.post("/fiscal-item-profiles", async (req, res) => {
     if (!dependencies.itemRepository) {
       res.status(503).json({
@@ -285,6 +310,27 @@ export function createFiscalProfileRouter(dependencies: FiscalProfileRouteDepend
     try {
       const profile = await dependencies.itemRepository.update(zohoItemId, parsed.data);
       res.status(200).json({ profile });
+    } catch (error: unknown) {
+      handleProfileError(req, res, error);
+    }
+  });
+
+  router.delete("/fiscal-item-profiles/:zohoItemId", async (req, res) => {
+    if (!dependencies.itemRepository) {
+      res.status(503).json({
+        error: {
+          code: "FISCAL_PROFILE_REPOSITORY_UNAVAILABLE",
+          message: "Fiscal item profile management is not configured.",
+        },
+      });
+      return;
+    }
+
+    const zohoItemId = typeof req.params["zohoItemId"] === "string" ? req.params["zohoItemId"] : "";
+
+    try {
+      await dependencies.itemRepository.delete(zohoItemId);
+      res.status(204).end();
     } catch (error: unknown) {
       handleProfileError(req, res, error);
     }

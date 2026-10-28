@@ -8,11 +8,12 @@ datasource db {
 }
 
 model FiscalizationRecord {
-  id            String @id @default(cuid()) @db.VarChar(100)
-  zohoInvoiceId String @unique @db.VarChar(255)
-  status        String @default("Pending") @db.VarChar(32)
-  snapshotVersion Int?
-  snapshotJson    String? @db.Text
+  id                String  @id @default(cuid()) @db.VarChar(100)
+  zohoInvoiceId     String  @unique @db.VarChar(255)
+  status            String  @default("Pending") @db.VarChar(32)
+  outcomeProvenance String? @db.VarChar(24)
+  snapshotVersion   Int?
+  snapshotJson      String? @db.Text
 
   receiptNumber String?   @db.VarChar(100)
   issuedAt      DateTime?
@@ -25,45 +26,159 @@ model FiscalizationRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  deviceAttempts          FiscalizationAttempt[]
+  etimsReportingOperation EtimsReportingOperation?
+  manualReviewCases       ManualReviewCase[]
+  zohoWritebackOperation  ZohoFiscalizationWritebackOperation?
+
   @@index([status])
+  @@index([createdAt, id])
+  @@index([status, createdAt, id])
+}
+
+model ManualReviewCase {
+  id                        String                 @id @db.VarChar(100)
+  fiscalizationRequestId    String                 @db.VarChar(100)
+  operationId               String                 @db.VarChar(100)
+  relatedAttemptIdsJson     String                 @db.Text
+  observedState             String                 @db.VarChar(32)
+  reason                    String                 @db.VarChar(500)
+  initiatingOperatorSubject String                 @db.VarChar(100)
+  resolvingOperatorSubject  String?                @db.VarChar(100)
+  resolvedAt                DateTime?
+  status                    String                 @default("open") @db.VarChar(16)
+  decisionSequence          Int                    @default(0)
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  request                   FiscalizationRecord    @relation(fields: [fiscalizationRequestId], references: [id], onDelete: Restrict)
+  decisions                 ManualReviewDecision[]
+
+  @@unique([fiscalizationRequestId, operationId])
+  @@index([status, updatedAt])
+}
+
+model ManualReviewDecision {
+  id                String           @id @db.VarChar(100)
+  caseId            String           @db.VarChar(100)
+  sequence          Int
+  operatorSubject   String           @db.VarChar(100)
+  requestedOutcome  String           @db.VarChar(32)
+  resolution        String           @db.VarChar(32)
+  reason            String           @db.VarChar(500)
+  evidenceReference String?          @db.VarChar(500)
+  recordedAt        DateTime         @default(now())
+  reviewCase        ManualReviewCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@unique([caseId, sequence])
+  @@index([caseId, recordedAt])
+}
+
+/// Durable history for each single-attempt device operation. No raw payloads or responses are stored.
+model FiscalizationAttempt {
+  id                     String              @id @db.VarChar(100)
+  fiscalizationRequestId String              @db.VarChar(100)
+  attemptNumber          Int
+  startedAt              DateTime
+  completedAt            DateTime?
+  outcome                String?             @db.VarChar(32)
+  receiptNumber          String?             @db.VarChar(100)
+  issuedAt               DateTime?
+  errorCode              String?             @db.VarChar(100)
+  errorMessage           String?             @db.VarChar(2000)
+  request                FiscalizationRecord @relation(fields: [fiscalizationRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([fiscalizationRequestId, attemptNumber])
+  @@index([fiscalizationRequestId, startedAt])
 }
 
 /// Durable eTIMS state for one immutable fiscalization request.
 model EtimsReportingOperation {
-  id                       String   @id @db.VarChar(100)
-  fiscalizationRequestId   String   @unique @db.VarChar(100)
-  zohoInvoiceId            String   @db.VarChar(255)
-  adapterType              String?  @db.VarChar(10)
-  adapterConfigurationId   String?  @db.VarChar(255)
-  correlationId            String   @unique @db.VarChar(100)
-  status                   String   @db.VarChar(32)
-  payloadHash              String   @db.VarChar(64)
-  attemptNumber            Int      @default(0)
-  providerReference        String?  @db.VarChar(255)
-  providerMetadataJson     String?  @db.Text
-  errorCategory            String?  @db.VarChar(100)
-  errorMessage             String?  @db.VarChar(500)
-  reconciliationRequired   Boolean  @default(false)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                          String   @id @db.VarChar(100)
+  fiscalizationRequestId      String   @unique @db.VarChar(100)
+  zohoInvoiceId               String   @db.VarChar(255)
+  adapterType                 String?  @db.VarChar(10)
+  adapterConfigurationId      String?  @db.VarChar(255)
+  simulated                   Boolean?
+  correlationId               String   @unique @db.VarChar(100)
+  status                      String   @db.VarChar(32)
+  payloadHash                 String   @db.VarChar(64)
+  attemptNumber               Int      @default(0)
+  reconciliationAttemptNumber Int      @default(0)
+  providerReference           String?  @db.VarChar(255)
+  providerMetadataJson        String?  @db.Text
+  errorCategory               String?  @db.VarChar(100)
+  errorMessage                String?  @db.VarChar(500)
+  reconciliationRequired      Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 
+  fiscalizationRequest FiscalizationRecord      @relation(fields: [fiscalizationRequestId], references: [id], onDelete: Restrict)
+  attempts             EtimsReportingAttempt[]
+  submissionPayloads   EtimsSubmissionPayload[]
+
+  @@unique([id, fiscalizationRequestId])
   @@index([status, updatedAt])
   @@index([zohoInvoiceId])
 }
 
+/// Durable, idempotent custom-field writeback state. Values are reconstructed
+/// from the authoritative fiscalization records; invoice payloads are not copied.
+model ZohoFiscalizationWritebackOperation {
+  id                        String              @id @db.VarChar(100)
+  fiscalizationRequestId    String              @unique @db.VarChar(100)
+  zohoInvoiceId             String              @db.VarChar(255)
+  organizationId            String              @db.VarChar(128)
+  correlationId             String              @unique @db.VarChar(100)
+  payloadHash               String              @db.VarChar(64)
+  status                    String              @db.VarChar(24)
+  writtenCustomFieldIdsJson String              @db.Text
+  errorCategory             String?             @db.VarChar(100)
+  leaseExpiresAt            DateTime?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  completedAt               DateTime?
+  request                   FiscalizationRecord @relation(fields: [fiscalizationRequestId], references: [id], onDelete: Restrict)
+
+  @@index([status, leaseExpiresAt])
+}
+
+/// Encrypted immutable submission payload used only for reconciliation of its original attempt.
+model EtimsSubmissionPayload {
+  operationId             String                  @db.VarChar(100)
+  fiscalizationRequestId  String                  @db.VarChar(100)
+  payloadVersion          Int
+  protectionVersion       Int                     @default(1)
+  encryptionKeyId         String                  @default("legacy-v1") @db.VarChar(100)
+  payloadHash             String                  @db.VarChar(64)
+  submissionAttemptType   String                  @default("submission") @db.VarChar(20)
+  submissionAttemptNumber Int
+  encryptedPayload        String                  @db.Text
+  createdAt               DateTime                @default(now())
+  operation               EtimsReportingOperation @relation(fields: [operationId, fiscalizationRequestId], references: [id, fiscalizationRequestId], onDelete: Restrict)
+  submissionAttempt       EtimsReportingAttempt   @relation(fields: [operationId, submissionAttemptType, submissionAttemptNumber], references: [operationId, attemptType, attemptNumber], onDelete: Restrict)
+
+  @@id([operationId, submissionAttemptNumber])
+  @@unique([operationId, submissionAttemptType, submissionAttemptNumber])
+  @@index([operationId, fiscalizationRequestId])
+}
+
 /// Append-only-attempt-level operational history; secrets and request bodies are excluded.
 model EtimsReportingAttempt {
-  id                 String    @id @db.VarChar(100)
-  operationId        String    @db.VarChar(100)
-  attemptNumber      Int
-  startedAt          DateTime
-  completedAt        DateTime?
-  outcome            String?   @db.VarChar(32)
-  providerReference  String?   @db.VarChar(255)
-  errorCategory      String?   @db.VarChar(100)
-  errorMessage       String?   @db.VarChar(500)
+  id                String    @id @db.VarChar(100)
+  operationId       String    @db.VarChar(100)
+  attemptType       String    @default("submission") @db.VarChar(20)
+  attemptNumber     Int
+  startedAt         DateTime
+  completedAt       DateTime?
+  outcome           String?   @db.VarChar(32)
+  providerReference String?   @db.VarChar(255)
+  errorCategory     String?   @db.VarChar(100)
+  errorMessage      String?   @db.VarChar(500)
 
-  @@unique([operationId, attemptNumber])
+  operation         EtimsReportingOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  submissionPayload EtimsSubmissionPayload?
+
+  @@unique([operationId, attemptType, attemptNumber])
   @@index([operationId, startedAt])
 }
 
@@ -86,47 +201,49 @@ model ZohoOAuthAttempt {
 /// Stores the encrypted credentials for the active Zoho connection.
 /// Only one connection ("primary") is supported by the current design.
 model ZohoToken {
-  id                    String   @id @default("primary") @db.VarChar(20)
-  encryptedAccessToken  String   @db.VarChar(2048)
-  encryptedRefreshToken String?  @db.VarChar(2048)
+  id                    String    @id @default("primary") @db.VarChar(20)
+  encryptedAccessToken  String    @db.VarChar(2048)
+  encryptedRefreshToken String?   @db.VarChar(2048)
   accessTokenExpiresAt  DateTime
-  apiDomain             String   @db.VarChar(255)
-  scopes                String   @db.VarChar(2000)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  apiDomain             String    @db.VarChar(255)
+  scopes                String    @db.VarChar(2000)
+  refreshLeaseToken     String?   @db.VarChar(100)
+  refreshLeaseExpiresAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 /// Explicitly configured fiscal identity and address for a Zoho customer.
 model FiscalCustomerProfile {
-  id                    String   @id @default(cuid()) @db.VarChar(100)
-  zohoCustomerId        String   @unique @db.VarChar(255)
-  companyName           String   @db.VarChar(30)
-  clientPin             String   @db.VarChar(14)
-  headquarters          String   @db.VarChar(30)
-  address               String   @db.VarChar(30)
-  postalCodeAndCity     String   @db.VarChar(30)
-  exemptionNumber       String?  @db.VarChar(30)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default(cuid()) @db.VarChar(100)
+  zohoCustomerId    String   @unique @db.VarChar(255)
+  companyName       String   @db.VarChar(30)
+  clientPin         String   @db.VarChar(14)
+  headquarters      String   @db.VarChar(30)
+  address           String   @db.VarChar(30)
+  postalCodeAndCity String   @db.VarChar(30)
+  exemptionNumber   String?  @db.VarChar(30)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([clientPin])
 }
 
 /// Durable operational history for Zoho invoice synchronization.
 model ZohoSyncRun {
-  id                  String    @id @db.VarChar(100)
-  organizationId      String    @db.VarChar(255)
-  status              String    @default("Running") @db.VarChar(20)
-  startedAt           DateTime  @default(now())
-  completedAt         DateTime?
-  discovered          Int       @default(0)
-  imported            Int       @default(0)
-  duplicatesSkipped   Int       @default(0)
-  rejected            Int       @default(0)
-  failed              Int       @default(0)
-  pagesRetrieved      Int       @default(0)
-  paginationComplete  Boolean   @default(false)
-  errorCode           String?   @db.VarChar(100)
+  id                 String    @id @db.VarChar(100)
+  organizationId     String    @db.VarChar(255)
+  status             String    @default("Running") @db.VarChar(20)
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  discovered         Int       @default(0)
+  imported           Int       @default(0)
+  duplicatesSkipped  Int       @default(0)
+  rejected           Int       @default(0)
+  failed             Int       @default(0)
+  pagesRetrieved     Int       @default(0)
+  paginationComplete Boolean   @default(false)
+  errorCode          String?   @db.VarChar(100)
 
   @@index([organizationId, startedAt])
 }
@@ -141,13 +258,38 @@ model ZohoSyncLock {
 
 /// Explicitly configured fiscal classification for a Zoho item.
 model FiscalItemProfile {
-  id                    String   @id @default(cuid()) @db.VarChar(100)
-  zohoItemId            String   @unique @db.VarChar(255)
-  measureUnit           String   @db.VarChar(3)
-  hsCode                String   @db.VarChar(10)
-  hsName                String   @db.VarChar(20)
-  vatClass              String   @db.VarChar(1)
-  vatGroupRate          String   @db.VarChar(20)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id           String   @id @default(cuid()) @db.VarChar(100)
+  zohoItemId   String   @unique @db.VarChar(255)
+  measureUnit  String   @db.VarChar(3)
+  hsCode       String   @db.VarChar(10)
+  hsName       String   @db.VarChar(20)
+  vatClass     String   @db.VarChar(1)
+  vatGroupRate String   @db.VarChar(20)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// Durable state for KRA reference reads. Provider cursors stay null until their semantics are verified.
+model KraReferenceSyncState {
+  id                String    @id @db.VarChar(100)
+  provider          String    @db.VarChar(20)
+  adapterIdentity   String    @db.VarChar(255)
+  taxpayerTin       String    @db.VarChar(11)
+  branchId          String    @db.VarChar(2)
+  category          String    @db.VarChar(40)
+  lastAttemptAt     DateTime?
+  lastSuccessAt     DateTime?
+  providerTimestamp String?   @db.VarChar(14)
+  providerCursor    String?   @db.VarChar(255)
+  activeVersion     String?   @db.VarChar(100)
+  attemptStatus     String    @default("not_attempted") @db.VarChar(32)
+  lastErrorCategory String?   @db.VarChar(50)
+  correlationId     String?   @db.VarChar(100)
+  leaseToken        String?   @db.VarChar(100)
+  leaseExpiresAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([provider, adapterIdentity, taxpayerTin, branchId, category])
+  @@index([attemptStatus, updatedAt])
 }

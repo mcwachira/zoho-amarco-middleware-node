@@ -6,6 +6,10 @@ import {
   type FiscalizationRecord,
 } from "../../domain/fiscalization/fiscalization-record.js";
 import { parseFiscalizationSnapshot } from "./fiscalization-snapshot.js";
+import {
+  DuplicateZohoInvoiceError,
+  FiscalizationRequestPersistenceError,
+} from "./fiscalization-errors.js";
 
 /**
  * Input needed to register a fiscalization request.
@@ -46,7 +50,12 @@ export class RegisterFiscalizationRequestService {
       new Date(snapshot.registeredAt),
     );
 
-    await this.repository.create(record);
+    try {
+      await this.repository.create(record);
+    } catch (error: unknown) {
+      if (error instanceof DuplicateZohoInvoiceError) throw error;
+      throw new FiscalizationRequestPersistenceError();
+    }
 
     // Return the Pending record only after persistence succeeds.
     // No claim and no device operation occur in this service.

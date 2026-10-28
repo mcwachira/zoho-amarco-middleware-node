@@ -17,8 +17,13 @@ export class ZohoInvoiceService {
    * Zoho API errors are allowed to propagate to the caller.
    * Mapping failures are returned as structured validation errors.
    */
-  async getFiscalInvoiceCandidate(invoiceId: string): Promise<InvoiceMappingResult> {
-    const invoice = await this.booksClient.getInvoice(invoiceId);
+  async getFiscalInvoiceCandidate(
+    invoiceId: string,
+    signal?: AbortSignal,
+  ): Promise<InvoiceMappingResult> {
+    const invoice = signal
+      ? await this.booksClient.getInvoice(invoiceId, signal)
+      : await this.booksClient.getInvoice(invoiceId);
 
     return mapZohoInvoice(invoice);
   }

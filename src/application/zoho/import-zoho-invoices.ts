@@ -2,6 +2,7 @@ import { DuplicateZohoInvoiceError } from "../fiscalization/fiscalization-errors
 import type { PrepareFiscalizationRequestService } from "../fiscalization/prepare-fiscalization-request.js";
 import {
   ZohoBooksApiError,
+  ZohoBooksAuthorizationError,
   ZohoBooksTransportError,
   type ZohoBooksClient,
 } from "../../integrations/zoho/books-client.js";
@@ -14,7 +15,8 @@ export interface ZohoInvoiceImportIssue {
     | "invoice_list_failed"
     | "pagination_limit_reached"
     | "synchronization_cancelled";
-  readonly code?: "ZOHO_API_ERROR" | "ZOHO_TRANSPORT_ERROR" | "INVALID_RESPONSE";
+  readonly code?:
+    "ZOHO_API_ERROR" | "ZOHO_AUTH_ERROR" | "ZOHO_TRANSPORT_ERROR" | "INVALID_RESPONSE";
   readonly upstreamStatus?: number;
   readonly fields?: readonly {
     readonly field: string;
@@ -64,8 +66,8 @@ export class ImportZohoInvoicesService {
     if (!Number.isSafeInteger(this.pageSize) || this.pageSize < 1 || this.pageSize > 200) {
       throw new Error("Invoice import page size must be between 1 and 200.");
     }
-    if (!Number.isSafeInteger(this.maxPages) || this.maxPages < 1) {
-      throw new Error("Invoice import maximum pages must be a positive integer.");
+    if (!Number.isSafeInteger(this.maxPages) || this.maxPages < 1 || this.maxPages > 1_000) {
+      throw new Error("Invoice import maximum pages must be between 1 and 1000.");
     }
   }
 
@@ -88,16 +90,24 @@ export class ImportZohoInvoicesService {
 
       let page;
       try {
-        page = await this.booksClient.listInvoicesPage(pageNumber, this.pageSize);
+        page = signal
+          ? await this.booksClient.listInvoicesPage(pageNumber, this.pageSize, signal)
+          : await this.booksClient.listInvoicesPage(pageNumber, this.pageSize);
       } catch (error: unknown) {
+        if (signal?.aborted) {
+          cancelled = true;
+          break;
+        }
         issues.push({
           category: "invoice_list_failed",
           code:
-            error instanceof ZohoBooksApiError
-              ? "ZOHO_API_ERROR"
-              : error instanceof ZohoBooksTransportError
-                ? "ZOHO_TRANSPORT_ERROR"
-                : "INVALID_RESPONSE",
+            error instanceof ZohoBooksAuthorizationError
+              ? "ZOHO_AUTH_ERROR"
+              : error instanceof ZohoBooksApiError
+                ? "ZOHO_API_ERROR"
+                : error instanceof ZohoBooksTransportError
+                  ? "ZOHO_TRANSPORT_ERROR"
+                  : "INVALID_RESPONSE",
           ...(error instanceof ZohoBooksApiError ? { upstreamStatus: error.status } : {}),
         });
         break;
@@ -118,7 +128,10 @@ export class ImportZohoInvoicesService {
             continue;
           }
 
-          const result = await this.prepareRequest.prepare(invoice.invoiceId);
+          signal?.throwIfAborted();
+          const result = signal
+            ? await this.prepareRequest.prepare(invoice.invoiceId, signal)
+            : await this.prepareRequest.prepare(invoice.invoiceId);
           if (result.kind === "registered") {
             imported += 1;
           } else {
@@ -130,6 +143,10 @@ export class ImportZohoInvoicesService {
             });
           }
         } catch (error: unknown) {
+          if (signal?.aborted) {
+            cancelled = true;
+            break;
+          }
           if (error instanceof DuplicateZohoInvoiceError) {
             duplicatesSkipped += 1;
           } else {
@@ -138,11 +155,13 @@ export class ImportZohoInvoicesService {
               invoiceId: invoice.invoiceId,
               category: "invoice_import_failed",
               code:
-                error instanceof ZohoBooksApiError
-                  ? "ZOHO_API_ERROR"
-                  : error instanceof ZohoBooksTransportError
-                    ? "ZOHO_TRANSPORT_ERROR"
-                    : "INVALID_RESPONSE",
+                error instanceof ZohoBooksAuthorizationError
+                  ? "ZOHO_AUTH_ERROR"
+                  : error instanceof ZohoBooksApiError
+                    ? "ZOHO_API_ERROR"
+                    : error instanceof ZohoBooksTransportError
+                      ? "ZOHO_TRANSPORT_ERROR"
+                      : "INVALID_RESPONSE",
               ...(error instanceof ZohoBooksApiError ? { upstreamStatus: error.status } : {}),
             });
           }

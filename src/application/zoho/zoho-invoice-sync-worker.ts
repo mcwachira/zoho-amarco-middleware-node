@@ -1,11 +1,17 @@
 import { logger } from "../../observability/logger.js";
 import type { ZohoInvoiceSynchronizationService } from "./zoho-invoice-synchronization.js";
+import {
+  operationalMetrics,
+  safelyBeginJobMetric,
+  type OperationalMetrics,
+} from "../../observability/operational-metrics.js";
 
 let workerStarted = false;
 
 export function startZohoInvoiceSyncWorker(options: {
   readonly service: ZohoInvoiceSynchronizationService;
   readonly intervalMs: number;
+  readonly metrics?: OperationalMetrics;
 }): { readonly stop: () => Promise<void> } {
   if (!Number.isSafeInteger(options.intervalMs) || options.intervalMs < 60_000) {
     throw new Error("Zoho synchronization interval must be at least one minute.");
@@ -18,19 +24,23 @@ export function startZohoInvoiceSyncWorker(options: {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: Promise<void> | undefined;
+  let activeAbortController: AbortController | undefined;
 
   const schedule = (): void => {
     if (stopped) return;
     timer = setTimeout(() => {
       timer = undefined;
-      inFlight = run();
+      activeAbortController = new AbortController();
+      inFlight = run(activeAbortController);
     }, options.intervalMs);
     timer.unref();
   };
 
-  const run = async (): Promise<void> => {
+  const run = async (abortController: AbortController): Promise<void> => {
+    const finishMetric = safelyBeginJobMetric(options.metrics ?? operationalMetrics, "zoho_sync");
     try {
-      const result = await options.service.execute();
+      const result = await options.service.execute(abortController.signal);
+      finishMetric(result.state === "failed" || result.state === "partial");
       if (result.state === "busy") {
         logger.info(
           "Scheduled Zoho synchronization skipped because another instance holds the lease",
@@ -50,8 +60,12 @@ export function startZohoInvoiceSyncWorker(options: {
         );
       }
     } catch {
+      finishMetric(true);
       logger.error("Scheduled Zoho invoice synchronization failed");
     } finally {
+      if (activeAbortController === abortController) {
+        activeAbortController = undefined;
+      }
       inFlight = undefined;
       schedule();
     }
@@ -66,6 +80,7 @@ export function startZohoInvoiceSyncWorker(options: {
         clearTimeout(timer);
         timer = undefined;
       }
+      activeAbortController?.abort();
       try {
         await inFlight;
       } finally {

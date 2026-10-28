@@ -6,10 +6,12 @@ import type { ZohoInvoiceService } from "../zoho/zoho-invoice-service.js";
 import type { InvoiceMappingResult } from "../zoho/zoho-invoice-mapper.js";
 import type { FiscalCustomerProfileRepository } from "./fiscal-customer-profile-repository.js";
 import type { FiscalItemProfileRepository } from "./fiscal-item-profile-repository.js";
+import type { PaymentsClient } from "./fiscalization-snapshot.js";
 import {
   buildFiscalizationSnapshot,
   type FiscalizationSnapshotBuildResult,
 } from "./fiscalization-snapshot.js";
+import { DuplicateZohoInvoiceError } from "./fiscalization-errors.js";
 
 /**
  * Result of preparing a fiscalization request.
@@ -31,6 +33,14 @@ export type PrepareFiscalizationRequestResult =
       readonly record: FiscalizationRecord;
     };
 
+export type SynchronizeFiscalizationRequestResult =
+  | Exclude<PrepareFiscalizationRequestResult, { readonly kind: "registered" }>
+  | {
+      readonly kind: "registered";
+      readonly record: FiscalizationRecord;
+      readonly alreadyExisted: boolean;
+    };
+
 export class PrepareFiscalizationRequestService {
   constructor(
     private readonly invoiceService: Pick<ZohoInvoiceService, "getFiscalInvoiceCandidate">,
@@ -42,6 +52,7 @@ export class PrepareFiscalizationRequestService {
       readonly zohoOrganizationId: string;
       readonly customerProfiles: Pick<FiscalCustomerProfileRepository, "findByZohoCustomerId">;
       readonly itemProfiles: Pick<FiscalItemProfileRepository, "findByZohoItemId">;
+      readonly paymentsClient?: Pick<PaymentsClient, "getInvoicePayments">;
       readonly generateId?: () => string;
       readonly now?: () => Date;
     },
@@ -51,7 +62,42 @@ export class PrepareFiscalizationRequestService {
     return this.registrationService.findExisting(invoiceId);
   }
 
-  async prepare(invoiceId: string): Promise<PrepareFiscalizationRequestResult> {
+  /**
+   * Synchronizes one Zoho invoice into the durable queue without processing
+   * it. The unique repository constraint arbitrates races between callers.
+   */
+  async synchronize(
+    invoiceId: string,
+    signal?: AbortSignal,
+  ): Promise<SynchronizeFiscalizationRequestResult> {
+    const requestedInvoiceId = invoiceId.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(requestedInvoiceId)) {
+      return {
+        kind: "mapping-failed",
+        errors: [{ field: "invoiceId", message: "A valid Zoho invoice ID is required." }],
+      };
+    }
+
+    signal?.throwIfAborted();
+    const existing = await this.registrationService.findExisting(requestedInvoiceId);
+    if (existing) return { kind: "registered", record: existing, alreadyExisted: true };
+
+    try {
+      const result = await this.prepare(requestedInvoiceId, signal);
+      return result.kind === "registered" ? { ...result, alreadyExisted: false } : result;
+    } catch (error: unknown) {
+      if (!(error instanceof DuplicateZohoInvoiceError)) throw error;
+      const winner = await this.registrationService.findExisting(requestedInvoiceId);
+      if (!winner) throw error;
+      return { kind: "registered", record: winner, alreadyExisted: true };
+    }
+  }
+
+  async prepare(
+    invoiceId: string,
+    signal?: AbortSignal,
+  ): Promise<PrepareFiscalizationRequestResult> {
+    signal?.throwIfAborted();
     const requestedInvoiceId = invoiceId.trim();
     if (!requestedInvoiceId) {
       return {
@@ -60,7 +106,10 @@ export class PrepareFiscalizationRequestService {
       };
     }
 
-    const mapping = await this.invoiceService.getFiscalInvoiceCandidate(requestedInvoiceId);
+    const mapping = signal
+      ? await this.invoiceService.getFiscalInvoiceCandidate(requestedInvoiceId, signal)
+      : await this.invoiceService.getFiscalInvoiceCandidate(requestedInvoiceId);
+    signal?.throwIfAborted();
 
     if (!mapping.success) {
       return {
@@ -87,8 +136,13 @@ export class PrepareFiscalizationRequestService {
       zohoOrganizationId: this.dependencies.zohoOrganizationId,
       customerProfiles: this.dependencies.customerProfiles,
       itemProfiles: this.dependencies.itemProfiles,
+      ...(this.dependencies.paymentsClient
+        ? { paymentsClient: this.dependencies.paymentsClient }
+        : {}),
       registeredAt,
+      signal,
     });
+    signal?.throwIfAborted();
 
     if (!snapshotResult.success) {
       return {

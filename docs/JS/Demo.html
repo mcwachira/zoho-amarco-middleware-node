@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html style="display: table; margin:auto; ">
+<head>
+	<title>ZFPLab HTML demo</title>
+	<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
+	<script type="text/javascript" src="js/FP/fp_core.js"></script>
+	<script type="text/javascript" src="js/FP/fp.js"></script>
+	<script type="text/javascript" src="js/demo.js"></script>
+	<script type="text/javascript" src="js/demo_interface.js"></script>
+</head>
+<body style="background-color:#d8d8ee; overflow:auto; vertical-align:middle; display:table-cell;">
+	<div id="content">
+		<div id="main" style="overflow-y:auto;">
+			<a href="javascript:fpGetLibraryVersions()">
+				<h3 id="titlecenter" style="background-color: transparent;" align="center"><u>ZfpLab HTML JS demo  (KE)</u></h3>
+			</a>
+			<div id="server_settings" style= "visibility:hidden; display:none;">
+				<table id="table_lab_settings" style="width: 100%;">
+					<tbody>
+						<tr>
+							<td colspan="2"> <a>ZfpLab Server settings:</a> </td>
+						</tr>
+						<tr>
+							<td><a>Server IP</a></td>
+							<td><input id="server_ip" value="localhost" /></td>
+						</tr>
+						<tr>
+							<td><a>Server TCP port</a></td>
+							<td><input id="server_port" value="4444" /></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button type="button" onclick="fpServerSetSettings(); showServerSettings(false); refreshServerButton();" style="width: 100%">Save server settings</button></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div id="server_settings_hidden">
+				<div>
+					<button id="but_show_lab_settings" onclick="showServerSettings(true)" style="width: 100%;">ZfpLab Server = localhost:4444</button>
+				</div>
+				<hr>
+				<div id="device_add_remove">
+					<button type="button" onclick="showDevSettings(true); showTcpSettings(true);" style="width: 46%; white-space: nowrap;">Add new device</button>
+					<button type="button" onclick="removeLastDevice()" style="width: 52%; white-space: nowrap;">Remove last device</button>
+					<div id="devices">
+							
+					</div>
+				</div>
+
+				<div id="device_settings" style="visibility:hidden; display:none">
+					<a>Add new device:</a>
+					<br>
+					<button style="width:49%" onclick="showTcpSettings(true)">TCP connection</button>
+					<button style="width:49%" onclick="showTcpSettings(false)">COM connection</button>
+					<table id="table_tcp" style="visibility:hidden; display:none; width: 100%;">
+						<tbody>
+							<tr><td><a>Device name</a></td><td><input id="dev_name" value="My Device" /></td></tr>
+							<tr><td><a>IP address</a></td><td><input id="dev_ip" value="10.10.10.136"/></td></tr>
+							<tr><td><a>TCP port</a></td><td><input id="dev_port" value="8000"/></td></tr>
+							<tr><td><a>ZFP password</a></td><td><input id="dev_pass" value="123456"/></td></tr>
+							<tr><td><button onclick="addDeviceCancel()" style="width:100%">Cancel</button></td><td><button onclick="addDevice(true)" style="width:100%">Save</button></td>
+						</tbody>
+					</table>
+					<table id="table_com" style="visibility:hidden; display:none; width: 100%;">
+						<tbody>
+							<tr><td><a>Device name</a></td><td><input id="dev_name2" value="My Device"/></td></tr>
+							<tr><td><a>Serial port</a></td><td><input id="dev_com" value="COM1"/></td></tr>
+							<tr><td><a>Baud rate</a></td><td><input id="dev_baud" value="115200"/></td></tr>
+							<tr><td><a>Keep port open</a></td><td><input id="dev_keep_open" type="checkbox" checked="true"/></td></tr>
+							<tr><td colspan="2"><button onclick="findDevice()" style="width:100%">Find device</button></td></tr>
+							<tr><td><button onclick="addDeviceCancel()" style="width:100%">Cancel</button></td><td><button onclick="addDevice(false)" style="width:100%">Save</button></td></tr>
+						</tbody>
+					</table>
+				</div>
+				<hr>
+				<div id="functions" style="visibility:hidden; display:none;">
+					<table id="table_funcs">
+						<tr>
+							<td><button onclick="fpReadVersion()" style="width:100%">Read Version</button></td>
+							<td><button onclick="fpGSReadDeviceInfo()" style="width:100%">GS Read Info</button></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button onclick="fpDiagnostics()" style="width:100%">Diagnostics</button></td>
+						</tr>
+						<tr>
+							<td><button onclick="fpXReport()" style="width:100%">X Report</button></td>
+							<td><button onclick="fpZReport()" style="width:100%">Z Report</button></td>
+						</tr>
+						<tr>
+							<td colspan="2"><br></td>
+						</tr>
+						<tr>
+							<td><a>Operator 1 pass</a></td>
+							<td><input id="fp_op1_pass" value="0000"/></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button onclick="fpOpenFiscReceipt()" style="width:100%">Open fiscal receipt</button></td>
+						</tr>
+						<tr>
+							<td><a>Article name</a></td>
+							<td><input id="fp_art_name" value="Bovine Semen"/></td>
+						</tr>
+						<tr>
+							<td><a>Article quantity</a></td>
+							<td><input id="fp_art_qty" value="1"/></td>
+						</tr>
+						<tr>
+							<td><a>Article price</a></td>
+							<td><input id="fp_art_price" value="2.5"/></td>
+						</tr>
+						<tr>
+							<td><a>Article HS code</a></td>
+							<td><input id="fp_art_hs_code" value="0001.11.00"/></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button onclick="fpSalePLU()" style="width:100%">Sell article</button></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button onclick="fpCloseReceiptInCash()" style="width:100%">Close fiscal receipt in cash</button></td>
+						</tr>
+						<tr>
+							<td colspan="2"><button onclick="fpCancelFiscalReceipt()" style="width:100%">Cancel fiscal receipt</button></td>
+						</tr>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

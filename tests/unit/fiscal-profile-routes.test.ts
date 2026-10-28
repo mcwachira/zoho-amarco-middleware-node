@@ -19,6 +19,7 @@ import {
 import { createApp } from "../../src/app.js";
 
 const TEST_TOKEN = "test-fiscal-profile-management-token";
+const TEST_OPERATOR_TOKEN = "test-fiscal-profile-operator-token-is-separate";
 
 const customerProfile: FiscalCustomerProfile = {
   id: "customer-profile-1",
@@ -67,12 +68,14 @@ function createRepositories() {
     findByZohoCustomerId: vi.fn(async () => customerProfile),
     create: vi.fn(async () => customerProfile),
     update: vi.fn(async () => customerProfile),
+    delete: vi.fn(async () => undefined),
   } satisfies FiscalCustomerProfileRepository;
 
   const itemRepository = {
     findByZohoItemId: vi.fn(async () => itemProfile),
     create: vi.fn(async () => itemProfile),
     update: vi.fn(async () => itemProfile),
+    delete: vi.fn(async () => undefined),
   } satisfies FiscalItemProfileRepository;
 
   return { customerRepository, itemRepository };
@@ -84,17 +87,18 @@ function createTestApp() {
     fiscalCustomerProfileRepository: repositories.customerRepository,
     fiscalItemProfileRepository: repositories.itemRepository,
     invoiceApiBearerToken: TEST_TOKEN,
+    operatorApiBearerToken: TEST_OPERATOR_TOKEN,
   });
 
   return { app, ...repositories };
 }
 
 function authenticated(
-  method: "get" | "post" | "put",
+  method: "get" | "post" | "put" | "delete",
   app: ReturnType<typeof createApp>,
   path: string,
 ) {
-  return request(app)[method](path).set("Authorization", `Bearer ${TEST_TOKEN}`);
+  return request(app)[method](path).set("Authorization", `Bearer ${TEST_OPERATOR_TOKEN}`);
 }
 
 describe("fiscal profile management routes", () => {
@@ -102,9 +106,11 @@ describe("fiscal profile management routes", () => {
     ["post", "/integrations/zoho/fiscal-customer-profiles"],
     ["get", "/integrations/zoho/fiscal-customer-profiles/customer-1"],
     ["put", "/integrations/zoho/fiscal-customer-profiles/customer-1"],
+    ["delete", "/integrations/zoho/fiscal-customer-profiles/customer-1"],
     ["post", "/integrations/zoho/fiscal-item-profiles"],
     ["get", "/integrations/zoho/fiscal-item-profiles/item-1"],
     ["put", "/integrations/zoho/fiscal-item-profiles/item-1"],
+    ["delete", "/integrations/zoho/fiscal-item-profiles/item-1"],
   ] as const)("requires bearer authentication for %s %s", async (method, path) => {
     const { app, customerRepository, itemRepository } = createTestApp();
 
@@ -115,9 +121,11 @@ describe("fiscal profile management routes", () => {
     expect(customerRepository.create).not.toHaveBeenCalled();
     expect(customerRepository.findByZohoCustomerId).not.toHaveBeenCalled();
     expect(customerRepository.update).not.toHaveBeenCalled();
+    expect(customerRepository.delete).not.toHaveBeenCalled();
     expect(itemRepository.create).not.toHaveBeenCalled();
     expect(itemRepository.findByZohoItemId).not.toHaveBeenCalled();
     expect(itemRepository.update).not.toHaveBeenCalled();
+    expect(itemRepository.delete).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid bearer token before calling a profile repository", async () => {
@@ -244,6 +252,35 @@ describe("fiscal profile management routes", () => {
     expect(itemRepository.update).toHaveBeenCalledOnce();
   });
 
+  it("deletes customer and item profiles and returns not-found for absent profiles", async () => {
+    const { app, customerRepository, itemRepository } = createTestApp();
+
+    const customerResponse = await authenticated(
+      "delete",
+      app,
+      "/integrations/zoho/fiscal-customer-profiles/customer-1",
+    );
+    expect(customerResponse.status).toBe(204);
+    expect(customerRepository.delete).toHaveBeenCalledWith("customer-1");
+
+    const itemResponse = await authenticated(
+      "delete",
+      app,
+      "/integrations/zoho/fiscal-item-profiles/item-1",
+    );
+    expect(itemResponse.status).toBe(204);
+    expect(itemRepository.delete).toHaveBeenCalledWith("item-1");
+
+    customerRepository.delete.mockRejectedValue(new FiscalProfileNotFoundError("customer"));
+    const missingResponse = await authenticated(
+      "delete",
+      app,
+      "/integrations/zoho/fiscal-customer-profiles/missing",
+    );
+    expect(missingResponse.status).toBe(404);
+    expect(missingResponse.body.error.code).toBe("FISCAL_PROFILE_NOT_FOUND");
+  });
+
   it("rejects malformed or incomplete customer and item request bodies", async () => {
     const { app, customerRepository, itemRepository } = createTestApp();
 
@@ -325,7 +362,7 @@ describe("fiscal profile management routes", () => {
   it("returns a generic 500 response for repository failures", async () => {
     const { app, itemRepository } = createTestApp();
     itemRepository.create.mockRejectedValue(
-      new Error("SQL Server connection password and query details"),
+      new Error("database connection password and query details"),
     );
 
     const response = await authenticated(
@@ -342,11 +379,14 @@ describe("fiscal profile management routes", () => {
       },
     });
     expect(JSON.stringify(response.body)).not.toContain("password");
-    expect(JSON.stringify(response.body)).not.toContain("SQL Server");
+    expect(JSON.stringify(response.body)).not.toContain("password");
   });
 
   it("keeps all profile routes unavailable rather than bypassing authentication when repositories are absent", async () => {
-    const app = createApp({ invoiceApiBearerToken: TEST_TOKEN });
+    const app = createApp({
+      invoiceApiBearerToken: TEST_TOKEN,
+      operatorApiBearerToken: TEST_OPERATOR_TOKEN,
+    });
 
     const response = await authenticated(
       "get",

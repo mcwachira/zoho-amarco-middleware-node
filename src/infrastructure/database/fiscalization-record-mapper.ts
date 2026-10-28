@@ -1,4 +1,5 @@
 import type { FiscalizationRecord } from "../../domain/fiscalization/fiscalization-record.js";
+import type { FiscalizationAttempt } from "../../domain/fiscalization/fiscalization-record.js";
 import {
   FiscalizationSnapshotError,
   parseFiscalizationSnapshot,
@@ -21,8 +22,45 @@ export interface FiscalizationRecordRow {
   failureCode: string | null;
   failureMessage: string | null;
   outcomeUnknownReason: string | null;
+  outcomeProvenance: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface FiscalizationAttemptRow {
+  id: string;
+  fiscalizationRequestId: string;
+  attemptNumber: number;
+  startedAt: Date;
+  completedAt: Date | null;
+  outcome: string | null;
+  receiptNumber: string | null;
+  issuedAt: Date | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+}
+
+const attemptOutcomes = ["succeeded", "failed", "outcome_unknown"] as const;
+
+export function toDomainAttempt(row: FiscalizationAttemptRow): FiscalizationAttempt {
+  if (row.attemptNumber < 1 || !Number.isSafeInteger(row.attemptNumber)) {
+    throw new Error("Database fiscalization attempt has an invalid attempt number.");
+  }
+  if (
+    row.outcome !== null &&
+    !attemptOutcomes.includes(row.outcome as (typeof attemptOutcomes)[number])
+  ) {
+    throw new Error(`Database contains an invalid fiscalization attempt outcome: ${row.outcome}.`);
+  }
+  const dates = [
+    row.startedAt,
+    ...(row.completedAt ? [row.completedAt] : []),
+    ...(row.issuedAt ? [row.issuedAt] : []),
+  ];
+  if (dates.some((date) => Number.isNaN(date.getTime()))) {
+    throw new Error("Database fiscalization attempt contains an invalid date.");
+  }
+  return { ...row, outcome: row.outcome as FiscalizationAttempt["outcome"] };
 }
 
 function isFiscalizationStatus(value: string): value is FiscalizationStatus {
@@ -32,6 +70,14 @@ function isFiscalizationStatus(value: string): value is FiscalizationStatus {
 export function toDomainRecord(row: FiscalizationRecordRow): FiscalizationRecord {
   if (!isFiscalizationStatus(row.status)) {
     throw new Error(`Invalid fiscalization status in database: "${row.status}".`);
+  }
+  if (
+    row.outcomeProvenance !== null &&
+    row.outcomeProvenance !== "simulated" &&
+    row.outcomeProvenance !== "authoritative" &&
+    row.outcomeProvenance !== "unverified"
+  ) {
+    throw new Error("Database record contains an invalid fiscalization outcome provenance.");
   }
 
   // Reject invalid dates before constructing the domain record.
@@ -139,6 +185,10 @@ export function toDomainRecord(row: FiscalizationRecordRow): FiscalizationRecord
     snapshot,
     snapshotVersion: row.snapshotVersion,
     status: row.status,
+    outcomeProvenance: (row.outcomeProvenance ?? null) as Exclude<
+      FiscalizationRecord["outcomeProvenance"],
+      undefined
+    >,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
     receipt,
@@ -154,6 +204,7 @@ export function toDatabaseRecord(record: FiscalizationRecord) {
     snapshotVersion: record.snapshot?.schemaVersion ?? null,
     snapshotJson: record.snapshot === null ? null : JSON.stringify(record.snapshot),
     status: record.status,
+    outcomeProvenance: record.outcomeProvenance ?? null,
     receiptNumber: record.receipt?.receiptNumber ?? null,
     issuedAt: record.receipt?.issuedAt ?? null,
     failureCode: record.failure?.code ?? null,

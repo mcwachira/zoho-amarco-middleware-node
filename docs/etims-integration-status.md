@@ -2,6 +2,13 @@
 
 **Status: not configured; no KRA/eTIMS submission is performed.**
 
+Separate direct OSCU and local VSCU protocol clients are now present. They are
+not registered as operational reporting adapters; see
+[KRA protocol clients](kra-protocol-clients.md) for routes, configuration,
+error behavior, evidence, and remaining acceptance work. The application still
+uses the fail-closed adapters and exposes protocol configuration diagnostics
+without contacting KRA or the VSCU service.
+
 Official KRA documents are now present in `docs/`:
 
 - `VSCU_Specification_Document_v2.0.pdf`, revision 2.0 dated 20 April 2023.
@@ -97,16 +104,51 @@ invent unsupported behavior.
   enable flag cannot make either production adapter operational.
 - The durable operation is unique per fiscalization request and pins its
   adapter/model, configuration identity, correlation ID, and immutable payload
-  SHA-256 hash. Request bodies and credentials are not persisted.
+  SHA-256 hash. The original canonical JSON supplied to a verified adapter is
+  persisted as versioned AES-256-GCM ciphertext, not plaintext, and is bound to
+  the operation, fiscalization request, digest, and exact submission attempt.
+  Credentials are not part of that payload-store contract.
 - The state machine includes `not_configured`, `blocked`, `pending`,
   `in_progress`, `accepted`, `rejected`, `outcome_unknown`, and
-  `reconciliation_required`. Confirmed `accepted` and `rejected` are terminal.
+  `reconciliation_required`, plus `reconciling` to claim one provider lookup at
+  a time. Confirmed `accepted` and `rejected` are terminal.
   Only an explicit provider-confirmed rejection is `rejected`; exceptions and
   ambiguous results become `outcome_unknown`.
 - A transactional compare-and-set claim changes only `pending` to
   `in_progress`, increments the attempt number, and creates the attempt record
   before an adapter is called. Completion updates the operation and attempt in
   one transaction and only while that same attempt remains in progress.
+- A compare-and-set claim moves an uncertain operation to `reconciling` before
+  any lookup, preventing concurrent workers from polling the same operation.
+  A stale reconciliation claim returns to `reconciliation_required`; it never
+  resubmits the invoice.
+- `startEtimsReconciliationWorker` scans only `outcome_unknown` and
+  `reconciliation_required` records whose `reconciliationRequired` flag is set
+  and whose adapter is selected, operational, contract-verified, and declares
+  reconciliation support. It recovers stale claims first, loads the exact
+  immutable submission payload through an injected resolver, and calls only
+  `EtimsReportingService.reconcile`. Provider `pending` and ambiguous responses
+  remain `reconciliation_required` and create durable reconciliation attempts.
+  Retries use exponential delay from 30 seconds up to 30 minutes and stop after
+  the configured attempt limit. The worker never calls `submit`.
+- Submission claims and encrypted payload persistence are atomic in both
+  supported database repositories. Payload resolution verifies the GCM tag,
+  UTF-8, payload version, operation/request/attempt association, and digest.
+  Missing, corrupt, or incompatible payloads fail closed. Existing operations
+  created before this migration have no payload row and remain blocked; never
+  reconstruct one from a digest.
+- The server registers the existing scheduler with graceful shutdown and
+  operator-visible health. It starts only when reconciliation is explicitly
+  enabled, reporting is enabled, secret-backed payload protection is
+  configured, and the selected adapter is operational and contract-verified.
+  The current `UnverifiedEtimsAdapter` advertises no operational reconciliation
+  capability, so current server startup does not start polling or make KRA
+  requests. `/health/integrations` reports this separately from provider health.
+- Payload rows are retained with restrictive foreign keys; no automatic
+  redaction or deletion is performed. Key rotation and retention require an
+  approved deployment procedure. AES-GCM protection is injectable, but the
+  default deployment mechanism is a secret-manager-injected environment key; a
+  managed KMS integration is not present.
 - A crashed stale `in_progress` operation can be recovered as
   `outcome_unknown`; it is never resent automatically. Reconciliation is
   capability-gated. Only an adapter explicitly declaring safe resubmission
@@ -115,13 +157,14 @@ invent unsupported behavior.
 - The authenticated fiscalization status route exposes eTIMS status separately
   from Tremol status, including adapter, attempt count, and reconciliation
   requirement. Neither direction of success is inferred from the other.
-- PostgreSQL and SQL Server have separate operation/attempt tables, unique
+- PostgreSQL have separate operation/attempt tables, unique
   indexes, and conditional state transitions. The migrations are additive and
   do not alter existing fiscalization records.
 
 These are application-level foundations, not a functioning KRA integration.
-The current server has no operational adapter, no lifecycle that creates a
-prepared KRA payload, and no submission or reconciliation endpoint.
+The server has a gated scheduler lifecycle and encrypted payload persistence,
+but no operational adapter or verified KRA reconciliation contract. The
+authenticated endpoint and scheduler therefore do not perform live KRA queries.
 
 ## Application status boundary
 
@@ -137,8 +180,24 @@ The default status and static blocker list are defined in
 reported by the service. No network call is made by the status endpoint. Tests
 use synthetic records and injected adapters only; they do not contact
 KRA/eTIMS, live Zoho, or a physical device. Schema validation does not apply
-the migrations or verify concurrency against live PostgreSQL or SQL Server
+the migrations or verify concurrency against live PostgreSQL
 instances.
+
+## Validation executed
+
+The latest local regression run completed with `pnpm test`: 58 test files
+passed, 5 were skipped; 707 tests passed and 20 were skipped. The skipped files
+are the opt-in PostgreSQL fiscalization, OAuth attempt/token, fresh migration,
+and PostgreSQL integration suite. The environment had no explicit test-database
+configuration and PostgreSQL on port 5438 did not respond; no migrations or
+database runtime assertions were run.
+
+`pnpm typecheck`, `pnpm typecheck:tests`, `pnpm lint`, `pnpm format:check`,
+`pnpm build`, `pnpm db:validate`, `pnpm openapi:lint`, and `git diff --check`
+passed. `pnpm audit:deps` still fails on the high-severity
+dependency audit findings described in the dependency security guide. No separate
+OpenAPI conformance script is configured; Redocly lint validated the OpenAPI
+document. No live Zoho, KRA/eTIMS, or Tremol integration was exercised.
 
 ## Required evidence before implementing submission
 
@@ -171,3 +230,15 @@ Obtain customer/KRA evidence that resolves:
 
 Until then, do not submit invoices, automatically retry uncertain requests, or
 infer payment evidence, tax treatment, fiscal success, or KRA acceptance.
+
+## Typed reference client status
+
+The standalone OSCU and VSCU clients now validate initialization and the
+documented incremental read request fields, and validate code, classification,
+branch, and item list data before returning accepted results. These checks are
+local protocol-boundary validation only. There is no durable reference-data
+sync table or worker; the KRA cursor-advance and full-snapshot-versus-delta
+semantics need confirmation before data can be made active. The health report
+separates valid local configuration from untested transport, local contract
+test coverage, sandbox verification, and provider approval. The latter two
+remain false, as do reconciliation verification and live permission.

@@ -12,10 +12,12 @@ import {
   type FiscalizationService as FiscalizationServiceType,
 } from "../../src/application/fiscalization/fiscalization-service.js";
 import type { FiscalizationRepository } from "../../src/application/fiscalization/fiscalization-repository.js";
+import type { FiscalizationRecord } from "../../src/domain/fiscalization/fiscalization-record.js";
 import type { PrepareTremolReceiptPlan } from "../../src/application/fiscalization/prepare-tremol-receipt-plan.js";
 import type { ImportZohoInvoicesService } from "../../src/application/zoho/import-zoho-invoices.js";
 import type { ZohoInvoiceSynchronizationService } from "../../src/application/zoho/zoho-invoice-synchronization.js";
 import type { EtimsReportingService } from "../../src/application/fiscalization/etims-reporting-service.js";
+import type { FiscalizationOrchestrationService } from "../../src/application/fiscalization/fiscalization-orchestration-service.js";
 
 import { createApp } from "../../src/app.js";
 
@@ -66,11 +68,13 @@ function createValidInvoiceBooksClientMock() {
 }
 
 const TEST_INVOICE_API_TOKEN = "test-invoice-api-token-for-unit-tests";
+const TEST_OPERATOR_API_TOKEN = "test-operator-api-token-is-a-distinct-secret";
 
 function createTestApp(dependencies: Parameters<typeof createApp>[0] = {}) {
   return createApp({
     ...dependencies,
     invoiceApiBearerToken: TEST_INVOICE_API_TOKEN,
+    operatorApiBearerToken: TEST_OPERATOR_API_TOKEN,
   });
 }
 
@@ -79,7 +83,7 @@ function authorizedRequest(
   app: ReturnType<typeof createApp>,
   path: string,
 ) {
-  return request(app)[method](path).set("Authorization", `Bearer ${TEST_INVOICE_API_TOKEN}`);
+  return request(app)[method](path).set("Authorization", `Bearer ${TEST_OPERATOR_API_TOKEN}`);
 }
 
 function createPreparationService(
@@ -135,6 +139,70 @@ function createPreparationService(
 }
 
 describe("Zoho Books routes", () => {
+  it("requires complete mapping inputs before invoking fiscalization execution", async () => {
+    const executeMapped = vi.fn();
+    const app = createTestApp({
+      fiscalizationOrchestrationService: {
+        executeMapped,
+      } as unknown as FiscalizationOrchestrationService,
+    });
+    const response = await request(app)
+      .post("/integrations/zoho/fiscalization-requests/request-123/execute")
+      .set("Authorization", `Bearer ${TEST_OPERATOR_API_TOKEN}`)
+      .send({ configuration: {}, context: {} });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_FISCALIZATION_WORKFLOW_INPUT");
+    expect(executeMapped).not.toHaveBeenCalled();
+  });
+
+  it("exposes writeback status and execution only to the configured API permissions", async () => {
+    const zohoWritebackService = {
+      execute: vi.fn().mockResolvedValue({
+        status: "succeeded",
+        requestId: "request-123",
+        correlationId: "writeback-correlation-1",
+        fieldsWritten: 2,
+        errorCategory: null,
+      }),
+      getStatus: vi.fn().mockResolvedValue({
+        status: "succeeded",
+        requestId: "request-123",
+        correlationId: "writeback-correlation-1",
+        fieldsWritten: 2,
+        errorCategory: null,
+      }),
+    };
+    const app = createTestApp({
+      zohoWritebackService: zohoWritebackService as never,
+    });
+
+    const forbidden = await request(app)
+      .post("/integrations/zoho/fiscalization-requests/request-123/zoho-writeback")
+      .set("Authorization", `Bearer ${TEST_INVOICE_API_TOKEN}`);
+    expect(forbidden.status).toBe(403);
+    expect(zohoWritebackService.execute).not.toHaveBeenCalled();
+
+    const written = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-123/zoho-writeback",
+    );
+    expect(written.status).toBe(200);
+    expect(written.body).toMatchObject({
+      status: "succeeded",
+      correlationId: "writeback-correlation-1",
+    });
+    expect(zohoWritebackService.execute).toHaveBeenCalledWith("request-123");
+
+    const status = await request(app)
+      .get("/integrations/zoho/fiscalization-requests/request-123/zoho-writeback")
+      .set("Authorization", `Bearer ${TEST_INVOICE_API_TOKEN}`);
+    expect(status.status).toBe(200);
+    expect(status.body).toMatchObject({ status: "succeeded", requestId: "request-123" });
+    expect(zohoWritebackService.getStatus).toHaveBeenCalledWith("request-123");
+  });
+
   it("runs invoice import independently of fiscalization processing", async () => {
     const execute = vi.fn().mockResolvedValue({
       state: "completed",
@@ -274,7 +342,7 @@ describe("Zoho Books routes", () => {
     expect(booksClient.getInvoice).toHaveBeenCalledWith("invoice-123");
   });
 
-  it("returns a generic 502 when Zoho Books rejects the request", async () => {
+  it("returns a safe authorization error when Zoho Books rejects the stored grant", async () => {
     const booksClient = createBooksClientMock();
 
     vi.mocked(booksClient.getInvoice).mockRejectedValue(
@@ -285,8 +353,8 @@ describe("Zoho Books routes", () => {
 
     const response = await authorizedRequest("get", app, "/integrations/zoho/invoices/invoice-123");
 
-    expect(response.status).toBe(502);
-    expect(response.body.error.code).toBe("ZOHO_BOOKS_UPSTREAM_ERROR");
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("ZOHO_BOOKS_AUTHORIZATION_REQUIRED");
     expect(JSON.stringify(response.body)).not.toContain("Sensitive upstream details");
   });
 
@@ -371,14 +439,14 @@ describe("Zoho Books routes", () => {
       "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("ZOHO_INVOICE_MAPPING_FAILED");
     expect(response.body.details).toEqual(
       expect.arrayContaining([expect.objectContaining({ field: "currency_code" })]),
     );
   });
 
-  it("returns a generic upstream error when Zoho retrieval fails", async () => {
+  it("returns a safe authorization error when Zoho retrieval rejects the grant", async () => {
     const booksClient = createValidInvoiceBooksClientMock();
 
     vi.mocked(booksClient.getInvoice).mockRejectedValue(
@@ -394,8 +462,8 @@ describe("Zoho Books routes", () => {
       "/integrations/zoho/invoices/invoice-123/fiscal-candidate",
     );
 
-    expect(response.status).toBe(502);
-    expect(response.body.error.code).toBe("ZOHO_BOOKS_UPSTREAM_ERROR");
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("ZOHO_BOOKS_AUTHORIZATION_REQUIRED");
     expect(JSON.stringify(response.body)).not.toContain("Sensitive upstream details");
   });
 
@@ -420,6 +488,7 @@ describe("Zoho Books routes", () => {
       id: "request-123",
       zohoInvoiceId: "invoice-123",
     });
+    expect(response.body.alreadyExisted).toBe(false);
     expect(response.body.request.status).toBe("Pending");
     expect(booksClient.getInvoice).toHaveBeenCalledOnce();
     expect(repository.create).toHaveBeenCalledOnce();
@@ -432,10 +501,17 @@ describe("Zoho Books routes", () => {
     expect(booksClient.getInvoice).toHaveBeenCalledWith("invoice-123");
   });
 
-  it("returns 409 when the invoice has already been registered", async () => {
+  it("returns the existing request when the invoice has already been registered", async () => {
     const booksClient = createValidInvoiceBooksClientMock();
+    const existing = {
+      id: "request-existing",
+      zohoInvoiceId: "invoice-123",
+      status: "Pending",
+      snapshot: null,
+    } as unknown as FiscalizationRecord;
 
     const { prepareService } = createPreparationService(booksClient, {
+      findByZohoInvoiceId: vi.fn().mockResolvedValue(existing),
       create: vi.fn().mockRejectedValue(new DuplicateZohoInvoiceError("invoice-123")),
     });
 
@@ -451,8 +527,137 @@ describe("Zoho Books routes", () => {
       "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
     );
 
-    expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe("FISCALIZATION_REQUEST_ALREADY_EXISTS");
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      alreadyExisted: true,
+      request: { id: "request-existing", zohoInvoiceId: "invoice-123", status: "Pending" },
+    });
+    expect(booksClient.getInvoice).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      upstreamStatus: 401,
+      apiCode: undefined,
+      expectedStatus: 503,
+      expectedCode: "ZOHO_BOOKS_AUTHORIZATION_REQUIRED",
+    },
+    {
+      upstreamStatus: 403,
+      apiCode: undefined,
+      expectedStatus: 503,
+      expectedCode: "ZOHO_BOOKS_AUTHORIZATION_REQUIRED",
+    },
+    {
+      upstreamStatus: 404,
+      apiCode: undefined,
+      expectedStatus: 502,
+      expectedCode: "ZOHO_BOOKS_UPSTREAM_ERROR",
+    },
+    {
+      upstreamStatus: 404,
+      apiCode: 1002,
+      expectedStatus: 404,
+      expectedCode: "ZOHO_INVOICE_NOT_FOUND",
+    },
+    {
+      upstreamStatus: 429,
+      apiCode: undefined,
+      expectedStatus: 503,
+      expectedCode: "ZOHO_BOOKS_RATE_LIMITED",
+    },
+    {
+      upstreamStatus: 503,
+      apiCode: undefined,
+      expectedStatus: 502,
+      expectedCode: "ZOHO_BOOKS_UPSTREAM_ERROR",
+    },
+  ])(
+    "returns a safe synchronization error for Zoho HTTP $upstreamStatus",
+    async ({ upstreamStatus, apiCode, expectedStatus, expectedCode }) => {
+      const booksClient = createValidInvoiceBooksClientMock();
+      vi.mocked(booksClient.getInvoice).mockRejectedValue(
+        new ZohoBooksApiError("sensitive provider message", upstreamStatus, apiCode),
+      );
+      const { prepareService } = createPreparationService(booksClient);
+      const app = createTestApp({
+        booksClient,
+        invoiceService: new ZohoInvoiceService(booksClient),
+        prepareFiscalizationRequestService: prepareService,
+      });
+
+      const response = await authorizedRequest(
+        "post",
+        app,
+        "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+      );
+
+      expect(response.status).toBe(expectedStatus);
+      expect(response.body.error.code).toBe(expectedCode);
+      expect(JSON.stringify(response.body)).not.toContain("sensitive provider message");
+    },
+  );
+
+  it("returns a safe persistence error when the validated request cannot be stored", async () => {
+    const booksClient = createValidInvoiceBooksClientMock();
+    const { prepareService } = createPreparationService(booksClient, {
+      create: vi.fn().mockRejectedValue(new Error("database password must not leak")),
+    });
+    const app = createTestApp({
+      booksClient,
+      invoiceService: new ZohoInvoiceService(booksClient),
+      prepareFiscalizationRequestService: prepareService,
+    });
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("FISCALIZATION_REQUEST_PERSISTENCE_FAILED");
+    expect(JSON.stringify(response.body)).not.toContain("database password");
+  });
+
+  it("rejects an invalid invoice identifier before Zoho retrieval", async () => {
+    const booksClient = createValidInvoiceBooksClientMock();
+    const { prepareService } = createPreparationService(booksClient);
+    const app = createTestApp({
+      booksClient,
+      invoiceService: new ZohoInvoiceService(booksClient),
+      prepareFiscalizationRequestService: prepareService,
+    });
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/invoices/invalid%40id/fiscalization-requests",
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_INVOICE_ID");
+    expect(booksClient.getInvoice).not.toHaveBeenCalled();
+  });
+
+  it("rejects caller-supplied invoice data instead of bypassing Zoho retrieval", async () => {
+    const booksClient = createValidInvoiceBooksClientMock();
+    const { prepareService } = createPreparationService(booksClient);
+    const app = createTestApp({
+      booksClient,
+      invoiceService: new ZohoInvoiceService(booksClient),
+      prepareFiscalizationRequestService: prepareService,
+    });
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/invoices/invoice-123/fiscalization-requests",
+    ).send({ invoice: { invoice_id: "forged" } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_INVOICE_SYNCHRONIZATION_INPUT");
+    expect(booksClient.getInvoice).not.toHaveBeenCalled();
   });
 
   it("does not register an invoice that fails mapping", async () => {
@@ -557,6 +762,8 @@ describe("Zoho Books routes", () => {
       id: "request-123",
       zohoInvoiceId: "invoice-123",
       status: "Pending",
+      deviceAttempts: [],
+      deviceSimulated: false,
       processingOutcome: {
         state: "pending",
         reconciliationRequired: false,
@@ -581,11 +788,12 @@ describe("Zoho Books routes", () => {
           "duplicate_reconciliation_unverified",
         ],
         etimsReporting: null,
+        etimsSimulated: false,
         zohoWriteBack: "not_configured",
       },
       createdAt: createdAt.toISOString(),
       updatedAt: updatedAt.toISOString(),
-      snapshot: { present: false, valid: false, version: null },
+      snapshot: { present: false, valid: false, version: null, snapshotId: null },
       receipt: null,
       failure: null,
       outcomeUnknown: false,
@@ -627,7 +835,7 @@ describe("Zoho Books routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.request).toMatchObject({
       status: "OutcomeUnknown",
-      snapshot: { present: false, valid: false, version: null },
+      snapshot: { present: false, valid: false, version: null, snapshotId: null },
       integrations: {
         etims: "not_configured",
         etimsBlockedBy: expect.any(Array),
@@ -797,6 +1005,123 @@ describe("Zoho Books routes", () => {
     });
   });
 
+  it("requires operator review when eTIMS outcome is uncertain after device success", async () => {
+    const repository = {
+      findById: vi.fn().mockResolvedValue({
+        id: "request-device-succeeded",
+        zohoInvoiceId: "invoice-123",
+        status: "Succeeded",
+        createdAt: new Date("2026-10-27T06:00:00.000Z"),
+        updatedAt: new Date("2026-10-27T06:01:00.000Z"),
+        snapshot: null,
+        snapshotVersion: null,
+        receipt: { receiptNumber: "SIM-DEVICE-1", issuedAt: new Date("2026-10-27T06:01:00.000Z") },
+        failure: null,
+        outcomeUnknownReason: null,
+      }),
+    } as unknown as FiscalizationRepository;
+    const etimsReportingService = {
+      getReadiness: () => ({ simulated: true, status: "outcome_unknown", blockers: [] }),
+      getByFiscalizationRequestId: vi.fn().mockResolvedValue({
+        operation: {
+          id: "etims-operation-uncertain",
+          status: "outcome_unknown",
+          reconciliationRequired: true,
+        },
+        attempts: [],
+      }),
+    } as unknown as EtimsReportingService;
+
+    const response = await authorizedRequest(
+      "get",
+      createTestApp({ fiscalizationRepository: repository, etimsReportingService }),
+      "/integrations/zoho/fiscalization-requests/request-device-succeeded",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.request).toMatchObject({
+      status: "Succeeded",
+      processingOutcome: {
+        state: "unknown_requires_reconciliation",
+        reconciliationRequired: true,
+      },
+      reconciliationRequired: true,
+      operatorReviewRequired: true,
+    });
+  });
+
+  it("exposes authenticated eTIMS reconciliation attempts without returning payloads", async () => {
+    const operation = {
+      id: "etims-operation-1",
+      correlationId: "correlation-1",
+      status: "reconciliation_required",
+      attemptNumber: 1,
+      reconciliationAttemptNumber: 1,
+      reconciliationRequired: true,
+    };
+    const attempt = {
+      id: "reconciliation-attempt-1",
+      attemptType: "reconciliation",
+      attemptNumber: 1,
+      startedAt: new Date("2026-10-27T06:00:00.000Z"),
+      completedAt: new Date("2026-10-27T06:00:01.000Z"),
+      outcome: "outcome_unknown",
+      providerReference: null,
+      errorCategory: "reconciliation_unknown",
+      errorMessage: "Provider lookup remains uncertain.",
+    };
+    const orchestration = {
+      getStatus: vi.fn().mockResolvedValue({ etims: { operation: { id: "etims-operation-1" } } }),
+      reconcileEtimsStage: vi.fn().mockResolvedValue({ operation, attempts: [attempt] }),
+    } as unknown as FiscalizationOrchestrationService;
+    const etimsReportingService = {
+      getReadiness: vi.fn(),
+    } as unknown as EtimsReportingService;
+    const app = createTestApp({
+      fiscalizationOrchestrationService: orchestration,
+      etimsReportingService,
+    });
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-1/etims/reconcile",
+    ).send({ payload: { synthetic: true } });
+
+    expect(response.status).toBe(200);
+    expect(response.body.operation).toMatchObject({
+      id: "etims-operation-1",
+      status: "reconciliation_required",
+      reconciliationRequired: true,
+    });
+    expect(response.body.attempts).toHaveLength(1);
+    expect(JSON.stringify(response.body)).not.toContain("synthetic");
+    expect(orchestration.reconcileEtimsStage).toHaveBeenCalledWith("request-1", {
+      synthetic: true,
+    });
+  });
+
+  it("requires an explicit immutable payload on reconciliation requests", async () => {
+    const orchestration = {
+      getStatus: vi.fn().mockResolvedValue({ etims: { operation: { id: "etims-operation-1" } } }),
+      reconcileEtimsStage: vi.fn(),
+    } as unknown as FiscalizationOrchestrationService;
+    const app = createTestApp({
+      fiscalizationOrchestrationService: orchestration,
+      etimsReportingService: { getReadiness: vi.fn() } as unknown as EtimsReportingService,
+    });
+
+    const response = await authorizedRequest(
+      "post",
+      app,
+      "/integrations/zoho/fiscalization-requests/request-1/etims/reconcile",
+    ).send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("ETIMS_RECONCILIATION_PAYLOAD_REQUIRED");
+    expect(orchestration.reconcileEtimsStage).not.toHaveBeenCalled();
+  });
+
   it("returns only safe failure information and redacts persisted messages", async () => {
     const repository = {
       findById: vi.fn().mockResolvedValue({
@@ -886,6 +1211,7 @@ describe("Zoho Books routes", () => {
       present: true,
       valid: false,
       version: 999,
+      snapshotId: null,
     });
     expect(response.body.request.operatorReviewRequired).toBe(true);
     expect(JSON.stringify(response.body)).not.toContain("invoice/customer details");

@@ -1,6 +1,7 @@
 import type { FiscalizationRepository } from "./fiscalization-repository.js";
 import type { FiscalDevice, FiscalDeviceResult } from "./fiscal-device.js";
 import type { FiscalizationRecord } from "../../domain/fiscalization/fiscalization-record.js";
+import type { FiscalizationSnapshot } from "../../domain/fiscalization/fiscalization-snapshot.js";
 import {
   FiscalizationSnapshotError,
   parseFiscalizationSnapshot,
@@ -35,6 +36,14 @@ export class FiscalizationClaimError extends Error {
   }
 }
 
+/** The device preflight failed before a receipt operation was claimed. */
+export class FiscalDeviceNotReadyError extends Error {
+  constructor(readonly reason: string) {
+    super("Fiscal device is not ready to issue a receipt.");
+    this.name = "FiscalDeviceNotReadyError";
+  }
+}
+
 /**
  * The device operation was attempted, but its outcome could not be saved.
  * Reconciliation is required. Never retry the device operation automatically.
@@ -53,6 +62,7 @@ export interface FiscalizationIssuancePolicy {
   readonly paymentSourceVerified: boolean;
   readonly taxRulesVerified: boolean;
   readonly deviceContractVerified: boolean;
+  readonly simulated?: boolean;
 }
 
 export type FiscalizationIssuanceBlocker =
@@ -139,6 +149,11 @@ export class FiscalizationService {
     return blockers;
   }
 
+  getIssuanceMode(): "simulation_only" | "enabled_unverified" | "disabled" {
+    if (this.issuancePolicy.simulated === true) return "simulation_only";
+    return this.getIssuanceBlockers().length === 0 ? "enabled_unverified" : "disabled";
+  }
+
   async fiscalize(input: StartFiscalizationInput): Promise<FiscalizationRecord> {
     const blockers = this.getIssuanceBlockers();
     const device = this.device;
@@ -168,6 +183,20 @@ export class FiscalizationService {
       );
     }
 
+    if (device.checkReadiness) {
+      let readiness: { readonly ready: boolean; readonly reason?: string };
+      try {
+        readiness = await device.checkReadiness();
+      } catch {
+        throw new FiscalDeviceNotReadyError("Device readiness could not be confirmed.");
+      }
+      if (!readiness.ready) {
+        throw new FiscalDeviceNotReadyError(
+          readiness.reason?.trim() || "Device readiness could not be confirmed.",
+        );
+      }
+    }
+
     // Step 3: Atomically claim Pending -> InProgress.
     // Only the successful claimant may proceed to the device.
     const claimed = await this.repository.claimPending(input.id);
@@ -176,12 +205,26 @@ export class FiscalizationService {
       throw new FiscalizationClaimError(input.id);
     }
 
-    const claimedSnapshot = parseFiscalizationSnapshot(claimed.snapshot, claimed.snapshotVersion);
-    if (
-      claimedSnapshot.snapshotId !== snapshot.snapshotId ||
-      claimedSnapshot.zohoOrganizationId !== this.zohoOrganizationId
-    ) {
-      throw new FiscalizationSnapshotError("The claimed request snapshot changed unexpectedly.");
+    let claimedSnapshot: FiscalizationSnapshot;
+    try {
+      claimedSnapshot = parseFiscalizationSnapshot(claimed.snapshot, claimed.snapshotVersion);
+      if (
+        claimedSnapshot.snapshotId !== snapshot.snapshotId ||
+        claimedSnapshot.zohoOrganizationId !== this.zohoOrganizationId
+      ) {
+        throw new FiscalizationSnapshotError("The claimed request snapshot changed unexpectedly.");
+      }
+    } catch {
+      // The device has not been called. Persist a definitive local failure so
+      // recovery does not misclassify this pre-send corruption as uncertain.
+      return this.persistOutcome(
+        input.id,
+        failFiscalization(claimed, {
+          code: "INVALID_CLAIMED_SNAPSHOT",
+          message:
+            "The claimed fiscalization snapshot failed integrity validation before device communication.",
+        }),
+      );
     }
 
     // Step 4: Attempt the device operation once.
@@ -231,20 +274,34 @@ export class FiscalizationService {
       }
     }
 
+    const outcomeProvenance =
+      this.issuancePolicy.simulated === true || device.executionMode === "simulated"
+        ? "simulated"
+        : device.executionMode === "real" &&
+            this.issuancePolicy.enabled &&
+            this.issuancePolicy.paymentSourceVerified &&
+            this.issuancePolicy.taxRulesVerified &&
+            this.issuancePolicy.deviceContractVerified
+          ? "authoritative"
+          : "unverified";
+    outcome = { ...outcome, outcomeProvenance };
+
     // Step 6: Persist the outcome.
     // Never call the device again if outcome persistence fails.
-    let saved: boolean;
+    return this.persistOutcome(input.id, outcome);
+  }
 
+  private async persistOutcome(
+    requestId: string,
+    outcome: FiscalizationRecord,
+  ): Promise<FiscalizationRecord> {
+    let saved: boolean;
     try {
       saved = await this.repository.saveOutcome(outcome);
     } catch {
-      throw new FiscalizationPersistenceError(input.id);
+      throw new FiscalizationPersistenceError(requestId);
     }
-
-    if (!saved) {
-      throw new FiscalizationPersistenceError(input.id);
-    }
-
+    if (!saved) throw new FiscalizationPersistenceError(requestId);
     return outcome;
   }
 }

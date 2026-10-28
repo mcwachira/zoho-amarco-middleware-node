@@ -23,6 +23,7 @@ export interface ZohoAuthorizationUrlOptions {
 
   /** PKCE S256 challenge derived from a separately stored verifier. */
   codeChallenge: string;
+  scopes?: readonly ("ZohoBooks.invoices.READ" | "ZohoBooks.invoices.UPDATE")[];
 }
 
 /**
@@ -88,7 +89,16 @@ export function buildZohoAuthorizationUrl(options: ZohoAuthorizationUrlOptions):
   authorizationUrl.searchParams.set("client_id", clientId);
   authorizationUrl.searchParams.set("response_type", "code");
   authorizationUrl.searchParams.set("redirect_uri", callbackUrl.toString());
-  authorizationUrl.searchParams.set("scope", "ZohoBooks.invoices.READ");
+  const scopes = options.scopes ?? ["ZohoBooks.invoices.READ"];
+  if (
+    scopes.length === 0 ||
+    scopes.some(
+      (scope) => scope !== "ZohoBooks.invoices.READ" && scope !== "ZohoBooks.invoices.UPDATE",
+    )
+  ) {
+    throw new Error("Zoho invoice OAuth scopes are invalid.");
+  }
+  authorizationUrl.searchParams.set("scope", [...new Set(scopes)].join(","));
   authorizationUrl.searchParams.set("access_type", "offline");
   authorizationUrl.searchParams.set("state", state);
   authorizationUrl.searchParams.set("code_challenge", codeChallenge);
