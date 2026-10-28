@@ -34,4 +34,7 @@ export interface FiscalItemProfileRepository {
    * Fails with FiscalProfileNotFoundError when no matching profile exists.
    */
   update(zohoItemId: string, profile: FiscalItemProfileData): Promise<FiscalItemProfile>;
+
+  /** Deletes a profile without changing any immutable fiscalization snapshots. */
+  delete(zohoItemId: string): Promise<void>;
 }
