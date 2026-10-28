@@ -6,3 +6,6 @@ pnpm-lock.yaml
 # Generated Prisma clients
 src/generated/prisma/
 prisma/src/generated/
+
+# Supplied vendor SDK source is reference material and must remain unmodified.
+docs/JS/
