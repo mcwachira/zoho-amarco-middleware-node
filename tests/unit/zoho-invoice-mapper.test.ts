@@ -40,6 +40,17 @@ function createInvoice(sourceOverrides: Record<string, unknown> = {}): ZohoInvoi
 }
 
 describe("mapZohoInvoice", () => {
+  it.each([{ status: "void" }, { is_void: true }])(
+    "rejects invoices explicitly identified as void (%o)",
+    (voidFields) => {
+      const result = mapZohoInvoice(createInvoice(voidFields));
+      expect(result).toMatchObject({
+        success: false,
+        errors: [{ field: "status" }],
+      });
+    },
+  );
+
   it("maps a valid invoice while preserving financial values", () => {
     const result = mapZohoInvoice(createInvoice());
 
@@ -75,6 +86,56 @@ describe("mapZohoInvoice", () => {
     });
   });
 
+  it("validates and preserves source date and discount evidence without recalculating totals", () => {
+    const result = mapZohoInvoice(
+      createInvoice({
+        date: "2026-10-27",
+        discount: "5%",
+        is_discount_before_tax: true,
+        line_items: [
+          {
+            line_item_id: "line-1",
+            item_id: "item-1",
+            quantity: 2,
+            rate: 150,
+            item_total: 285,
+            discount_amount: 15,
+            tax_percentage: 16,
+          },
+        ],
+        sub_total: 285,
+        tax_total: 45.6,
+        total: 330.6,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      candidate: {
+        invoiceDate: "2026-10-27",
+        discount: "5%",
+        discountBeforeTax: true,
+        lines: [{ discountAmount: "15" }],
+        subtotal: "285",
+        taxTotal: "45.6",
+        total: "330.6",
+      },
+    });
+  });
+
+  it.each([
+    { date: "2026-02-30" },
+    { date: "27/10/2026" },
+    { discount: "-5%" },
+    { discount: "not-a-discount" },
+    { is_discount_before_tax: "yes" },
+    { line_items: [{ quantity: 0, rate: 10, item_total: 10 }] },
+    { line_items: [{ quantity: 1, rate: -1, item_total: 10 }] },
+    { line_items: [{ quantity: 1, rate: 10, item_total: 10, discount_amount: -1 }] },
+  ])("rejects invalid date, discount, quantity, or price evidence: %o", (overrides) => {
+    expect(mapZohoInvoice(createInvoice(overrides)).success).toBe(false);
+  });
+
   it("preserves decimal strings without converting them to floating-point numbers", () => {
     const result = mapZohoInvoice(
       createInvoice({
@@ -101,6 +162,35 @@ describe("mapZohoInvoice", () => {
     expect(result.candidate.lines[0]?.unitPrice).toBe("19.90");
     expect(result.candidate.subtotal).toBe("24.875");
     expect(result.candidate.taxTotal).toBe("0.00");
+  });
+
+  it("checks source aggregate totals with exact decimal arithmetic", () => {
+    const valid = mapZohoInvoice(
+      createInvoice({ sub_total: "0.10", tax_total: "0.20", total: "0.30" }),
+    );
+    expect(valid.success).toBe(true);
+
+    const inconsistent = mapZohoInvoice(
+      createInvoice({ sub_total: "0.10", tax_total: "0.20", total: "0.31" }),
+    );
+    expect(inconsistent).toEqual({
+      success: false,
+      errors: [
+        {
+          field: "total",
+          message:
+            "Zoho invoice total does not equal its subtotal plus tax total. Review the source invoice amounts before fiscal preparation.",
+        },
+      ],
+    });
+  });
+
+  it("normalizes finite JSON numbers written with an exponent before decimal comparison", () => {
+    const result = mapZohoInvoice(createInvoice({ sub_total: 1e-7, tax_total: 0, total: 1e-7 }));
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected a valid finite decimal invoice.");
+    expect(result.candidate.subtotal).toBe("0.0000001");
+    expect(result.candidate.total).toBe("0.0000001");
   });
 
   it("does not infer receipt payment data from invoice totals or generic paid fields", () => {

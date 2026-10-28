@@ -3,11 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { FiscalCustomerProfile as CustomerRecord } from "../../src/application/fiscalization/fiscal-customer-profile-repository.js";
 import type { FiscalItemProfile as ItemRecord } from "../../src/application/fiscalization/fiscal-item-profile-repository.js";
 import type { PrismaClient as PostgresqlClient } from "../../src/generated/prisma/postgresql/client.js";
-import type { PrismaClient as SqlServerClient } from "../../src/generated/prisma/sqlserver/client.js";
 import { PostgresqlFiscalCustomerProfileRepository } from "../../src/infrastructure/database/postgresql-fiscal-customer-profile-repository.js";
 import { PostgresqlFiscalItemProfileRepository } from "../../src/infrastructure/database/postgresql-fiscal-item-profile-repository.js";
-import { SqlServerFiscalCustomerProfileRepository } from "../../src/infrastructure/database/sqlserver-fiscal-customer-profile-repository.js";
-import { SqlServerFiscalItemProfileRepository } from "../../src/infrastructure/database/sqlserver-fiscal-item-profile-repository.js";
 
 const customerData = {
   companyName: "Example Ltd",
@@ -69,6 +66,9 @@ function createPrismaMock() {
         return row;
       },
     ),
+    delete: vi.fn(async ({ where }: { where: { zohoCustomerId: string } }) => {
+      if (!customers.delete(where.zohoCustomerId)) throw prismaRecordNotFound();
+    }),
   };
 
   const fiscalItemProfile = {
@@ -104,6 +104,9 @@ function createPrismaMock() {
         return row;
       },
     ),
+    delete: vi.fn(async ({ where }: { where: { zohoItemId: string } }) => {
+      if (!items.delete(where.zohoItemId)) throw prismaRecordNotFound();
+    }),
   };
 
   const prisma = { fiscalCustomerProfile, fiscalItemProfile };
@@ -122,13 +125,6 @@ const providers = [
         prisma as unknown as PostgresqlClient,
       ),
       item: new PostgresqlFiscalItemProfileRepository(prisma as unknown as PostgresqlClient),
-    }),
-  },
-  {
-    name: "SQL Server",
-    createRepositories: (prisma: ReturnType<typeof createPrismaMock>["prisma"]) => ({
-      customer: new SqlServerFiscalCustomerProfileRepository(prisma as unknown as SqlServerClient),
-      item: new SqlServerFiscalItemProfileRepository(prisma as unknown as SqlServerClient),
     }),
   },
 ] as const;
@@ -181,6 +177,19 @@ describe.each(providers)("$name fiscal profile repository contract", ({ createRe
     });
   });
 
+  it("deletes customer profiles by normalized identity and reports missing records", async () => {
+    const mock = createPrismaMock();
+    const { customer } = createRepositories(mock.prisma);
+    await customer.create({ zohoCustomerId: "customer-1", ...customerData });
+
+    await expect(customer.delete(" customer-1 ")).resolves.toBeUndefined();
+    await expect(customer.findByZohoCustomerId("customer-1")).resolves.toBeNull();
+    await expect(customer.delete("missing-customer")).rejects.toMatchObject({
+      name: "FiscalProfileNotFoundError",
+      kind: "customer",
+    });
+  });
+
   it("creates and finds item profiles and keeps decimal strings intact", async () => {
     const mock = createPrismaMock();
     const { item } = createRepositories(mock.prisma);
@@ -215,6 +224,19 @@ describe.each(providers)("$name fiscal profile repository contract", ({ createRe
     expect(updated.hsName).toBe("Updated");
 
     await expect(item.update("missing-item", itemData)).rejects.toMatchObject({
+      name: "FiscalProfileNotFoundError",
+      kind: "item",
+    });
+  });
+
+  it("deletes item profiles by normalized identity and reports missing records", async () => {
+    const mock = createPrismaMock();
+    const { item } = createRepositories(mock.prisma);
+    await item.create({ zohoItemId: "item-1", ...itemData });
+
+    await expect(item.delete(" item-1 ")).resolves.toBeUndefined();
+    await expect(item.findByZohoItemId("item-1")).resolves.toBeNull();
+    await expect(item.delete("missing-item")).rejects.toMatchObject({
       name: "FiscalProfileNotFoundError",
       kind: "item",
     });

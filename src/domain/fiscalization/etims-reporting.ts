@@ -7,6 +7,7 @@ export const ETIMS_REPORTING_STATES = [
   "rejected",
   "outcome_unknown",
   "reconciliation_required",
+  "reconciling",
 ] as const;
 
 export type EtimsReportingState = (typeof ETIMS_REPORTING_STATES)[number];
@@ -15,10 +16,12 @@ export type EtimsAdapterType = "vscu" | "oscu";
 export interface EtimsReportingAttempt {
   readonly id: string;
   readonly operationId: string;
+  readonly attemptType: "submission" | "reconciliation";
   readonly attemptNumber: number;
   readonly startedAt: Date;
   readonly completedAt: Date | null;
-  readonly outcome: "accepted" | "rejected" | "outcome_unknown" | null;
+  readonly outcome:
+    "accepted" | "rejected" | "outcome_unknown" | "confirmed_not_found" | "pending" | null;
   readonly providerReference: string | null;
   readonly errorCategory: string | null;
   readonly errorMessage: string | null;
@@ -30,10 +33,13 @@ export interface EtimsReportingOperation {
   readonly zohoInvoiceId: string;
   readonly adapterType: EtimsAdapterType | null;
   readonly adapterConfigurationId: string | null;
+  /** Persisted adapter provenance; null marks legacy/unclassified operations. */
+  readonly simulated?: boolean | null;
   readonly correlationId: string;
   readonly status: EtimsReportingState;
   readonly payloadHash: string;
   readonly attemptNumber: number;
+  readonly reconciliationAttemptNumber: number;
   readonly providerReference: string | null;
   readonly providerMetadataJson: string | null;
   readonly errorCategory: string | null;
@@ -52,11 +58,12 @@ const allowedTransitions: Readonly<Record<EtimsReportingState, readonly EtimsRep
   not_configured: [],
   blocked: [],
   pending: ["blocked", "in_progress"],
-  in_progress: ["accepted", "rejected", "outcome_unknown"],
+  in_progress: ["accepted", "rejected", "outcome_unknown", "blocked"],
   accepted: [],
   rejected: [],
-  outcome_unknown: ["reconciliation_required"],
-  reconciliation_required: ["accepted", "rejected", "pending", "reconciliation_required"],
+  outcome_unknown: ["blocked", "reconciliation_required", "reconciling"],
+  reconciliation_required: ["accepted", "blocked", "rejected", "pending", "reconciling"],
+  reconciling: ["accepted", "rejected", "pending", "reconciliation_required"],
 };
 
 export class InvalidEtimsReportingTransitionError extends Error {

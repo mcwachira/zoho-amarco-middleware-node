@@ -12,10 +12,12 @@ interface EtimsOperationRow {
   zohoInvoiceId: string;
   adapterType: string | null;
   adapterConfigurationId: string | null;
+  simulated: boolean | null;
   correlationId: string;
   status: string;
   payloadHash: string;
   attemptNumber: number;
+  reconciliationAttemptNumber: number;
   providerReference: string | null;
   providerMetadataJson: string | null;
   errorCategory: string | null;
@@ -28,6 +30,7 @@ interface EtimsOperationRow {
 interface EtimsAttemptRow {
   id: string;
   operationId: string;
+  attemptType: string;
   attemptNumber: number;
   startedAt: Date;
   completedAt: Date | null;
@@ -52,11 +55,16 @@ export function mapEtimsAttempt(row: EtimsAttemptRow): EtimsReportingAttempt {
     row.outcome !== null &&
     row.outcome !== "accepted" &&
     row.outcome !== "rejected" &&
-    row.outcome !== "outcome_unknown"
+    row.outcome !== "outcome_unknown" &&
+    row.outcome !== "confirmed_not_found" &&
+    row.outcome !== "pending"
   ) {
     throw new Error("Stored eTIMS reporting attempt has an invalid outcome.");
   }
-  return { ...row, outcome: row.outcome };
+  if (row.attemptType !== "submission" && row.attemptType !== "reconciliation") {
+    throw new Error("Stored eTIMS attempt has an invalid type.");
+  }
+  return { ...row, outcome: row.outcome, attemptType: row.attemptType };
 }
 
 export function mapEtimsDetails(

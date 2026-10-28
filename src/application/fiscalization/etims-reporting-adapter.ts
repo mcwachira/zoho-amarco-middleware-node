@@ -20,11 +20,18 @@ export interface EtimsAdapterStatus {
   readonly contractVerified: boolean;
   readonly operational: boolean;
   readonly configurationId: string | null;
+  /** True only for a local/test adapter; never represents KRA evidence. */
+  readonly simulated?: boolean;
   readonly blockers: readonly string[];
   readonly capabilities: EtimsAdapterCapabilities;
 }
 
 export type EtimsAdapterSubmissionResult =
+  | {
+      readonly kind: "not_submitted";
+      readonly errorCategory: string;
+      readonly safeMessage: string;
+    }
   | {
       readonly kind: "accepted";
       readonly providerReference: string | null;
@@ -57,13 +64,20 @@ export type EtimsAdapterReconciliationResult =
       readonly safeMetadataJson: string | null;
     }
   | { readonly kind: "confirmed_not_found" }
-  | { readonly kind: "outcome_unknown"; readonly safeMessage: string };
+  | { readonly kind: "outcome_unknown"; readonly safeMessage: string }
+  | { readonly kind: "pending"; readonly safeMessage: string };
 
 export interface EtimsReportingAdapter {
   readonly status: EtimsAdapterStatus;
   validate(request: PreparedEtimsReportingRequest): Promise<readonly string[]>;
-  submit(request: PreparedEtimsReportingRequest): Promise<EtimsAdapterSubmissionResult>;
-  reconcile(request: PreparedEtimsReportingRequest): Promise<EtimsAdapterReconciliationResult>;
+  submit(
+    request: PreparedEtimsReportingRequest,
+    signal?: AbortSignal,
+  ): Promise<EtimsAdapterSubmissionResult>;
+  reconcile(
+    request: PreparedEtimsReportingRequest,
+    signal?: AbortSignal,
+  ): Promise<EtimsAdapterReconciliationResult>;
 }
 
 export class UnverifiedEtimsAdapter implements EtimsReportingAdapter {

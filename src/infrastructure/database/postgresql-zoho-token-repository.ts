@@ -33,6 +33,8 @@ export class PostgresqlZohoTokenRepository implements ZohoTokenRepository {
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,
         apiDomain: tokens.apiDomain,
         scopes: tokens.scopes,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
       update: {
         encryptedAccessToken: tokens.encryptedAccessToken,
@@ -42,7 +44,53 @@ export class PostgresqlZohoTokenRepository implements ZohoTokenRepository {
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,
         apiDomain: tokens.apiDomain,
         scopes: tokens.scopes,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
+    });
+  }
+
+  async tryAcquireRefreshLease(leaseToken: string, now: Date, expiresAt: Date): Promise<boolean> {
+    const claimed = await this.prisma.zohoToken.updateMany({
+      where: {
+        id: "primary",
+        OR: [{ refreshLeaseToken: null }, { refreshLeaseExpiresAt: { lte: now } }],
+      },
+      data: { refreshLeaseToken: leaseToken, refreshLeaseExpiresAt: expiresAt },
+    });
+    return claimed.count === 1;
+  }
+
+  async saveRefreshedTokens(
+    leaseToken: string,
+    now: Date,
+    tokens: SaveZohoTokens,
+  ): Promise<boolean> {
+    const saved = await this.prisma.zohoToken.updateMany({
+      where: {
+        id: "primary",
+        refreshLeaseToken: leaseToken,
+        refreshLeaseExpiresAt: { gt: now },
+      },
+      data: {
+        encryptedAccessToken: tokens.encryptedAccessToken,
+        ...(tokens.encryptedRefreshToken !== undefined
+          ? { encryptedRefreshToken: tokens.encryptedRefreshToken }
+          : {}),
+        accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+        apiDomain: tokens.apiDomain,
+        scopes: tokens.scopes,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
+      },
+    });
+    return saved.count === 1;
+  }
+
+  async releaseRefreshLease(leaseToken: string): Promise<void> {
+    await this.prisma.zohoToken.updateMany({
+      where: { id: "primary", refreshLeaseToken: leaseToken },
+      data: { refreshLeaseToken: null, refreshLeaseExpiresAt: null },
     });
   }
 

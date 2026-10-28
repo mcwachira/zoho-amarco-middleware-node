@@ -12,6 +12,7 @@ const ALLOWED_ZOHO_ACCOUNTS_HOSTS = new Set([
   "accounts.zoho.jp",
   "accounts.zoho.com.cn",
   "accounts.zoho.sa",
+  "accounts.zoho.ae",
   "accounts.zoho.uk",
   "accounts.zohocloud.ca",
 ]);

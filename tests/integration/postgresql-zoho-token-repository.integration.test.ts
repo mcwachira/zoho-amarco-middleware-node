@@ -85,4 +85,64 @@ integrationDescribe("PostgreSQL Zoho token repository (integration)", () => {
       encryptedRefreshToken: initialTokens.encryptedRefreshToken,
     });
   });
+
+  it("allows one database instance to own and complete an expired-token refresh lease", async () => {
+    const now = new Date();
+    const firstLease = `refresh-${randomUUID()}`;
+    const secondLease = `refresh-${randomUUID()}`;
+    await repository.save({
+      encryptedAccessToken: "synthetic-expired-access",
+      encryptedRefreshToken: "synthetic-refresh",
+      accessTokenExpiresAt: new Date(now.getTime() - 1000),
+      apiDomain: "https://www.zohoapis.com",
+      scopes: "ZohoBooks.invoices.READ",
+    });
+
+    const claims = await Promise.all([
+      repository.tryAcquireRefreshLease(firstLease, now, new Date(now.getTime() + 30_000)),
+      repository.tryAcquireRefreshLease(secondLease, now, new Date(now.getTime() + 30_000)),
+    ]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    const winner = claims[0] ? firstLease : secondLease;
+    const loser = claims[0] ? secondLease : firstLease;
+
+    const refreshedTokens = {
+      encryptedAccessToken: "synthetic-refreshed-access",
+      encryptedRefreshToken: "synthetic-rotated-refresh",
+      accessTokenExpiresAt: new Date(now.getTime() + 3_600_000),
+      apiDomain: "https://www.zohoapis.com",
+      scopes: "ZohoBooks.invoices.READ",
+    };
+    await expect(repository.saveRefreshedTokens(loser, new Date(), refreshedTokens)).resolves.toBe(
+      false,
+    );
+    await expect(repository.saveRefreshedTokens(winner, new Date(), refreshedTokens)).resolves.toBe(
+      true,
+    );
+    expect(await repository.get()).toMatchObject({
+      ...refreshedTokens,
+      encryptedRefreshToken: "synthetic-rotated-refresh",
+    });
+
+    const crashedOwner = `refresh-crashed-${randomUUID()}`;
+    const recoveryOwner = `refresh-recovered-${randomUUID()}`;
+    const shortLeaseExpiresAt = new Date(now.getTime() + 1_000);
+    expect(await repository.tryAcquireRefreshLease(crashedOwner, now, shortLeaseExpiresAt)).toBe(
+      true,
+    );
+    const afterLeaseExpiry = new Date(now.getTime() + 2_000);
+    expect(
+      await repository.tryAcquireRefreshLease(
+        recoveryOwner,
+        afterLeaseExpiry,
+        new Date(afterLeaseExpiry.getTime() + 30_000),
+      ),
+    ).toBe(true);
+    await expect(
+      repository.saveRefreshedTokens(crashedOwner, afterLeaseExpiry, refreshedTokens),
+    ).resolves.toBe(false);
+    await expect(
+      repository.saveRefreshedTokens(recoveryOwner, afterLeaseExpiry, refreshedTokens),
+    ).resolves.toBe(true);
+  });
 });

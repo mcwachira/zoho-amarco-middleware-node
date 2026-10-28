@@ -1,4 +1,9 @@
 import { XMLParser, XMLValidator } from "fast-xml-parser";
+import {
+  TremolHttpTransport,
+  type TremolTransport,
+  TremolTransportError,
+} from "./tremol-zfplabserver-transport.js";
 
 /**
  * Read-only commands supported by this client.
@@ -45,13 +50,12 @@ export interface TremolClientOptions {
   readonly baseUrl: string;
   readonly timeoutMs?: number;
   readonly fetchImpl?: typeof fetch;
+  /** Optional transport injection for deterministic tests and platform bridges. */
+  readonly transport?: TremolTransport;
 }
 
 export class TremolHttpError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly responseBody: string,
-  ) {
+  constructor(public readonly status: number) {
     super(`ZFPLabServer returned HTTP ${status}.`);
     this.name = "TremolHttpError";
   }
@@ -63,10 +67,7 @@ export class TremolHttpError extends Error {
  * This does not automatically mean the device state is unchanged.
  */
 export class TremolDeviceError extends Error {
-  constructor(
-    public readonly resultCode: number,
-    public readonly responseBody: string,
-  ) {
+  constructor(public readonly resultCode: number) {
     super(`ZFPLabServer command failed with result code ${resultCode}.`);
     this.name = "TremolDeviceError";
   }
@@ -82,6 +83,8 @@ export class TremolProtocolError extends Error {
     this.name = "TremolProtocolError";
   }
 }
+
+export { TremolTransportError };
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -149,42 +152,90 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const STATUS_FIELDS = {
+  Power_down_in_opened_fiscal_receipt: "powerDownInOpenedFiscalReceipt",
+  DateTime_not_set: "dateTimeNotSet",
+  DateTime_wrong: "dateTimeWrong",
+  RAM_reset: "ramReset",
+  Hardware_clock_error: "hardwareClockError",
+  Reports_registers_Overflow: "registersOverflow",
+  Opened_Fiscal_Receipt: "fiscalReceiptOpened",
+  Receipt_Invoice_Type: "receiptInvoiceType",
+  SD_card_near_full: "sdCardNearFull",
+  SD_card_full: "sdCardFull",
+  CU_fiscalized: "cuFiscalized",
+  CU_produced: "cuProduced",
+  Paired_with_TIMS: "pairedWithTims",
+  Unsent_receipts: "unsentReceipts",
+  Service_contract_nearly_expired: "serviceContractNearlyExpired",
+  No_Sec_IC: "noSecurityIc",
+  No_certificates: "noCertificates",
+  Service_jumper: "serviceJumper",
+  Expired_service_contract: "expiredServiceContract",
+  Missing_SD_card: "missingSdCard",
+  Wrong_SD_card: "wrongSdCard",
+  Update_is_available: "updateAvailable",
+} as const satisfies Readonly<Record<string, Exclude<keyof TremolStatusFlags, "readiness">>>;
+
 /**
- * The Kenya protocol defines six raw status bytes, but the supplied
- * ZFPLabServer documentation does not define their XML result names or value
- * serialization. Until that mapping is confirmed, all individual flags stay
- * unknown and readiness is never inferred.
+ * The supplied Kenya SDK definitions map the protocol's named status bits to
+ * `Type="Status"` values "0"/"1". Missing fields stay unknown; readiness is
+ * never inferred. A captured response from the target LabServer is still
+ * required to establish that installation's XML serialization.
  */
 export function parseTremolStatusFlags(body: string): TremolStatusFlags {
   const resultCode = parseResultCode(body);
   if (resultCode !== 0) {
-    throw new TremolDeviceError(resultCode, body);
+    throw new TremolDeviceError(resultCode);
+  }
+
+  const parsed = xmlParser.parse(body);
+  if (!isRecord(parsed) || !isRecord(parsed["Res"])) {
+    throw new TremolProtocolError("ZFPLabServer returned an invalid Res element.");
+  }
+  const rawValues = parsed["Res"]["Res"];
+  const entries = Array.isArray(rawValues) ? rawValues : rawValues === undefined ? [] : [rawValues];
+  const mapped: Partial<Record<Exclude<keyof TremolStatusFlags, "readiness">, boolean>> = {};
+
+  for (const entry of entries) {
+    if (!isRecord(entry)) continue;
+    const name = entry["@_Name"];
+    if (typeof name !== "string" || !(name in STATUS_FIELDS)) continue;
+    const flag = STATUS_FIELDS[name as keyof typeof STATUS_FIELDS];
+    const value = entry["@_Value"];
+    if (entry["@_Type"] !== "Status" || (value !== "0" && value !== "1")) {
+      throw new TremolProtocolError(`ZFPLabServer returned an invalid ${name} status value.`);
+    }
+    if (flag in mapped) {
+      throw new TremolProtocolError(`ZFPLabServer returned a duplicate ${name} status value.`);
+    }
+    mapped[flag] = value === "1";
   }
 
   return {
     readiness: "unknown",
-    powerDownInOpenedFiscalReceipt: null,
-    dateTimeNotSet: null,
-    dateTimeWrong: null,
-    ramReset: null,
-    hardwareClockError: null,
-    registersOverflow: null,
-    fiscalReceiptOpened: null,
-    receiptInvoiceType: null,
-    sdCardNearFull: null,
-    sdCardFull: null,
-    cuFiscalized: null,
-    cuProduced: null,
-    pairedWithTims: null,
-    unsentReceipts: null,
-    serviceContractNearlyExpired: null,
-    noSecurityIc: null,
-    noCertificates: null,
-    serviceJumper: null,
-    expiredServiceContract: null,
-    missingSdCard: null,
-    wrongSdCard: null,
-    updateAvailable: null,
+    powerDownInOpenedFiscalReceipt: mapped.powerDownInOpenedFiscalReceipt ?? null,
+    dateTimeNotSet: mapped.dateTimeNotSet ?? null,
+    dateTimeWrong: mapped.dateTimeWrong ?? null,
+    ramReset: mapped.ramReset ?? null,
+    hardwareClockError: mapped.hardwareClockError ?? null,
+    registersOverflow: mapped.registersOverflow ?? null,
+    fiscalReceiptOpened: mapped.fiscalReceiptOpened ?? null,
+    receiptInvoiceType: mapped.receiptInvoiceType ?? null,
+    sdCardNearFull: mapped.sdCardNearFull ?? null,
+    sdCardFull: mapped.sdCardFull ?? null,
+    cuFiscalized: mapped.cuFiscalized ?? null,
+    cuProduced: mapped.cuProduced ?? null,
+    pairedWithTims: mapped.pairedWithTims ?? null,
+    unsentReceipts: mapped.unsentReceipts ?? null,
+    serviceContractNearlyExpired: mapped.serviceContractNearlyExpired ?? null,
+    noSecurityIc: mapped.noSecurityIc ?? null,
+    noCertificates: mapped.noCertificates ?? null,
+    serviceJumper: mapped.serviceJumper ?? null,
+    expiredServiceContract: mapped.expiredServiceContract ?? null,
+    missingSdCard: mapped.missingSdCard ?? null,
+    wrongSdCard: mapped.wrongSdCard ?? null,
+    updateAvailable: mapped.updateAvailable ?? null,
   };
 }
 
@@ -201,7 +252,7 @@ export interface TremolCloseReceiptMetadata {
 export function parseTremolCloseReceiptMetadata(body: string): TremolCloseReceiptMetadata {
   const resultCode = parseResultCode(body);
   if (resultCode !== 0) {
-    throw new TremolDeviceError(resultCode, body);
+    throw new TremolDeviceError(resultCode);
   }
 
   let parsed: unknown;
@@ -281,7 +332,7 @@ export function parseTremolVersion(body: string): string {
     throw new TremolProtocolError("ZFPLabServer returned an invalid result code.");
   }
   if (resultCode !== 0) {
-    throw new TremolDeviceError(resultCode, body);
+    throw new TremolDeviceError(resultCode);
   }
 
   const resultValues = root["Res"];
@@ -308,7 +359,7 @@ export function parseTremolVersion(body: string): string {
 export class TremolZfpLabServerClient {
   private readonly baseUrl: URL;
   private readonly timeoutMs: number;
-  private readonly fetchImpl: typeof fetch;
+  private readonly transport: TremolTransport;
 
   /**
    * Serializes commands within this client instance.
@@ -321,22 +372,42 @@ export class TremolZfpLabServerClient {
 
     this.baseUrl = new URL(baseUrl);
     this.timeoutMs = options.timeoutMs ?? 5_000;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.transport =
+      options.transport ??
+      new TremolHttpTransport({
+        timeoutMs: options.timeoutMs ?? 5_000,
+        ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      });
 
     if (
       !["http:", "https:"].includes(this.baseUrl.protocol) ||
       this.baseUrl.username ||
-      this.baseUrl.password
+      this.baseUrl.password ||
+      this.baseUrl.search ||
+      this.baseUrl.hash ||
+      (this.baseUrl.pathname !== "/" && this.baseUrl.pathname !== "")
     ) {
-      throw new Error("A valid HTTP(S) ZFPLabServer URL is required.");
+      throw new Error(
+        "ZFPLabServer URL must be an HTTP(S) origin without credentials or path data.",
+      );
     }
 
-    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs <= 0) {
-      throw new Error("timeoutMs must be a positive integer.");
+    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 100 || this.timeoutMs > 120_000) {
+      throw new Error("timeoutMs must be an integer between 100 and 120000 milliseconds.");
     }
   }
 
   executeRead(command: TremolReadCommand): Promise<TremolCommandResponse> {
+    if (
+      command !== "ReadStatus()" &&
+      command !== "ReadVersion()" &&
+      command !== "ReadCurrentReceiptInfo()" &&
+      command !== "ReadLastAndTotalReceiptNum()"
+    ) {
+      return Promise.reject(
+        new TremolProtocolError("The requested Tremol command is unsupported."),
+      );
+    }
     const operation = this.commandQueue.then(() => this.executeReadInternal(command));
 
     this.commandQueue = operation.then(
@@ -369,31 +440,34 @@ export class TremolZfpLabServerClient {
     };
   }
 
+  /** Stops new requests and aborts any pending HTTP transport operations. */
+  close(): Promise<void> {
+    return this.transport.close();
+  }
+
   private async executeReadInternal(command: TremolReadCommand): Promise<TremolCommandResponse> {
     const url = new URL(command, this.baseUrl);
 
-    const response = await this.fetchImpl(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/xml, text/xml, text/plain",
-      },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-
-    const body = await response.text();
-
-    if (!response.ok) {
-      throw new TremolHttpError(response.status, body);
+    let response;
+    try {
+      response = await this.transport.get(url);
+    } catch (error: unknown) {
+      if (error instanceof TremolTransportError) throw error;
+      throw new TremolTransportError("outcome-unknown", "network_error");
     }
+
+    const { status, body } = response;
+
+    if (status < 200 || status >= 300) throw new TremolHttpError(status);
 
     const resultCode = parseResultCode(body);
 
     if (resultCode !== 0) {
-      throw new TremolDeviceError(resultCode, body);
+      throw new TremolDeviceError(resultCode);
     }
 
     return {
-      status: response.status,
+      status,
       resultCode,
       body,
     };

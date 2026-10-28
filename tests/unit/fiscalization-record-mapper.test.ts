@@ -52,6 +52,7 @@ function makeRow(overrides: Partial<FiscalizationRecordRow> = {}): Fiscalization
     failureCode: null,
     failureMessage: null,
     outcomeUnknownReason: null,
+    outcomeProvenance: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

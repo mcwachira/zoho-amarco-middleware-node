@@ -38,4 +38,7 @@ export interface FiscalCustomerProfileRepository {
     zohoCustomerId: string,
     profile: FiscalCustomerProfileData,
   ): Promise<FiscalCustomerProfile>;
+
+  /** Deletes a profile without changing any immutable fiscalization snapshots. */
+  delete(zohoCustomerId: string): Promise<void>;
 }

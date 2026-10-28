@@ -19,6 +19,7 @@ function createHarness() {
     zohoToken: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
+      updateMany: vi.fn(),
     },
   };
 
@@ -52,9 +53,13 @@ describe("PostgresqlZohoTokenRepository", () => {
       create: {
         id: "primary",
         ...tokens,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
       update: {
         ...tokens,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
     });
   });
@@ -75,9 +80,13 @@ describe("PostgresqlZohoTokenRepository", () => {
         id: "primary",
         ...tokensWithoutRefreshToken,
         encryptedRefreshToken: null,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
       update: {
         ...tokensWithoutRefreshToken,
+        refreshLeaseToken: null,
+        refreshLeaseExpiresAt: null,
       },
     });
 
@@ -111,6 +120,54 @@ describe("PostgresqlZohoTokenRepository", () => {
         updatedAt: true,
       },
     });
+  });
+
+  it("claims, owner-checks, and releases refresh leases atomically", async () => {
+    prismaMock.zohoToken.updateMany.mockResolvedValueOnce({ count: 1 });
+    await expect(
+      repository.tryAcquireRefreshLease("lease-1", now, new Date(now.getTime() + 30_000)),
+    ).resolves.toBe(true);
+    expect(prismaMock.zohoToken.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: "primary",
+        OR: [{ refreshLeaseToken: null }, { refreshLeaseExpiresAt: { lte: now } }],
+      },
+      data: {
+        refreshLeaseToken: "lease-1",
+        refreshLeaseExpiresAt: new Date(now.getTime() + 30_000),
+      },
+    });
+
+    prismaMock.zohoToken.updateMany.mockResolvedValueOnce({ count: 1 });
+    await expect(repository.saveRefreshedTokens("lease-1", now, tokens)).resolves.toBe(true);
+    expect(prismaMock.zohoToken.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: "primary",
+        refreshLeaseToken: "lease-1",
+        refreshLeaseExpiresAt: { gt: now },
+      },
+      data: { ...tokens, refreshLeaseToken: null, refreshLeaseExpiresAt: null },
+    });
+
+    prismaMock.zohoToken.updateMany.mockResolvedValueOnce({ count: 0 });
+    await repository.releaseRefreshLease("stale-owner");
+    expect(prismaMock.zohoToken.updateMany).toHaveBeenNthCalledWith(3, {
+      where: { id: "primary", refreshLeaseToken: "stale-owner" },
+      data: { refreshLeaseToken: null, refreshLeaseExpiresAt: null },
+    });
+  });
+
+  it("preserves the prior refresh token when a lease owner receives no replacement", async () => {
+    prismaMock.zohoToken.updateMany.mockResolvedValue({ count: 1 });
+    const refreshed = {
+      encryptedAccessToken: "new-encrypted-access",
+      accessTokenExpiresAt: new Date(now.getTime() + 3_600_000),
+      apiDomain: tokens.apiDomain,
+      scopes: tokens.scopes,
+    };
+    await repository.saveRefreshedTokens("lease-owner", now, refreshed);
+    const update = prismaMock.zohoToken.updateMany.mock.calls[0]?.[0];
+    expect(update?.data).not.toHaveProperty("encryptedRefreshToken");
   });
 
   it("returns null when no token record exists", async () => {

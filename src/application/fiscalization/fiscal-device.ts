@@ -40,6 +40,10 @@ export type FiscalDeviceResult =
  * never blindly retry an operation whose outcome is uncertain.
  */
 export interface FiscalDevice {
+  /** Explicit execution source; omitted implementations are unverified. */
+  readonly executionMode?: "simulated" | "real";
+  /** Optional preflight check; it must not begin receipt issuance. */
+  checkReadiness?(): Promise<{ readonly ready: boolean; readonly reason?: string }>;
   /**
    * Attempts to issue a fiscal receipt for the supplied invoice.
    *

@@ -42,4 +42,32 @@ describe("Zoho invoice synchronization worker", () => {
       "Zoho synchronization interval must be at least one minute.",
     );
   });
+
+  it("aborts an active synchronization before waiting for it to stop", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const execute = vi.fn(
+      (providedSignal?: AbortSignal) =>
+        new Promise<{ state: "failed"; run: { id: string } }>((resolve) => {
+          signal = providedSignal;
+          providedSignal?.addEventListener(
+            "abort",
+            () => resolve({ state: "failed", run: { id: "run-1" } }),
+            { once: true },
+          );
+        }),
+    );
+    const worker = startZohoInvoiceSyncWorker({
+      service: { execute } as unknown as ZohoInvoiceSynchronizationService,
+      intervalMs: 60_000,
+    });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(signal?.aborted).toBe(false);
+
+    await worker.stop();
+
+    expect(signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

@@ -98,6 +98,96 @@ describe("fiscalization snapshots", () => {
     expect(snapshot.invoice.total).toBe("0.2320000000000000232");
   });
 
+  it("archives and integrity-validates source invoice date and discount evidence", async () => {
+    const invoiceWithDiscountEvidence: FiscalInvoiceCandidate = {
+      ...invoice,
+      invoiceDate: "2026-10-27",
+      discount: "5%",
+      discountBeforeTax: true,
+      lines: [{ ...invoice.lines[0]!, discountAmount: "1.25" }],
+    };
+    const snapshot = await makeFiscalizationSnapshot(invoiceWithDiscountEvidence);
+    const parsed = parseFiscalizationSnapshot(snapshot, snapshot.schemaVersion);
+
+    expect(parsed.invoice).toMatchObject({
+      invoiceDate: "2026-10-27",
+      discount: "5%",
+      discountBeforeTax: true,
+      lines: [{ discountAmount: "1.25" }],
+    });
+  });
+
+  it("fails preparation with a sanitized validation result when configured payment retrieval fails", async () => {
+    const { customerProfiles, itemProfiles } = createProfileRepositories();
+    const result = await buildFiscalizationSnapshot({
+      invoice,
+      zohoOrganizationId: "organization-1",
+      customerProfiles,
+      itemProfiles,
+      paymentsClient: {
+        getInvoicePayments: vi.fn().mockRejectedValue(new Error("secret-bearing transport error")),
+      },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      errors: [
+        {
+          field: "payments",
+          message:
+            "Zoho payment evidence could not be retrieved; the fiscalization request was not registered.",
+        },
+      ],
+    });
+  });
+
+  it("follows every reported payment page and preserves the applied payment evidence", async () => {
+    const { customerProfiles, itemProfiles } = createProfileRepositories();
+    const getInvoicePayments = vi
+      .fn()
+      .mockResolvedValueOnce({
+        page: 1,
+        hasMore: true,
+        payments: [
+          {
+            paymentId: "payment-1",
+            paymentNumber: null,
+            paymentMode: "cash",
+            amount: "10.25",
+            date: null,
+            referenceNumber: null,
+            description: null,
+            source: { payment_id: "payment-1", private_note: "synthetic sensitive fixture" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ page: 2, hasMore: false, payments: [] });
+    const result = await buildFiscalizationSnapshot({
+      invoice,
+      zohoOrganizationId: "organization-1",
+      customerProfiles,
+      itemProfiles,
+      paymentsClient: { getInvoicePayments },
+      registeredAt: new Date("2026-10-27T00:00:00.000Z"),
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.snapshot.payments).toMatchObject([
+        {
+          paymentId: "payment-1",
+          amount: "10.25",
+          paymentMode: "cash",
+          source: { responseSha256: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        },
+      ]);
+      expect(JSON.stringify(result.snapshot.payments)).not.toContain("synthetic sensitive fixture");
+      expect(JSON.stringify(result.snapshot.payments)).not.toContain('"payment_id"');
+    }
+    expect(getInvoicePayments).toHaveBeenNthCalledWith(1, invoice.zohoInvoiceId, undefined, 1);
+    expect(getInvoicePayments).toHaveBeenNthCalledWith(2, invoice.zohoInvoiceId, undefined, 2);
+  });
+
   it("rejects missing required customer or item mappings", async () => {
     const { customerProfiles, itemProfiles } = createProfileRepositories();
     customerProfiles.findByZohoCustomerId.mockResolvedValue(null);
@@ -157,6 +247,31 @@ describe("fiscalization snapshots", () => {
     };
 
     expect(() => parseFiscalizationSnapshot(tampered, 1)).toThrow(FiscalizationSnapshotError);
+  });
+
+  it("rejects oversized persisted snapshots before validating their contents", async () => {
+    const snapshot = await makeFiscalizationSnapshot(invoice);
+    const line = snapshot.invoice.lines[0]!;
+    const oversized = {
+      ...snapshot,
+      invoice: {
+        ...snapshot.invoice,
+        lines: Array.from({ length: 10_000 }, () => line),
+      },
+    };
+
+    expect(() => parseFiscalizationSnapshot(oversized, 1)).toThrow(
+      "exceeds the supported storage size",
+    );
+  });
+
+  it("rejects snapshots that cannot be safely serialized", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic["self"] = cyclic;
+
+    expect(() => parseFiscalizationSnapshot(cyclic, 1)).toThrow(
+      "stored fiscalization snapshot is not valid JSON",
+    );
   });
 
   it("rejects unsupported snapshot versions", async () => {

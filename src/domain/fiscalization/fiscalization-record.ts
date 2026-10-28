@@ -29,11 +29,25 @@ export interface FiscalizationFailure {
   readonly message: string;
 }
 
+/** Durable, sanitized history for one device call. */
+export interface FiscalizationAttempt {
+  readonly id: string;
+  readonly fiscalizationRequestId: string;
+  readonly attemptNumber: number;
+  readonly startedAt: Date;
+  readonly completedAt: Date | null;
+  readonly outcome: "succeeded" | "failed" | "outcome_unknown" | null;
+  readonly receiptNumber: string | null;
+  readonly issuedAt: Date | null;
+  readonly errorCode: string | null;
+  readonly errorMessage: string | null;
+}
+
 /**
  * Represents one fiscalization attempt for a Zoho Books invoice.
  *
  * This is a domain model, not a database model. It does not depend on
- * Prisma, Express, SQL Server, PostgreSQL, or the Tremol device SDK.
+ * Prisma, Express, PostgreSQL, or the Tremol device SDK.
  */
 export interface FiscalizationRecord {
   /** Our internal, unique identifier for this record. */
@@ -48,6 +62,9 @@ export interface FiscalizationRecord {
 
   /** The current state of this fiscalization attempt. */
   readonly status: FiscalizationStatus;
+
+  /** Provenance persisted with the outcome; null denotes legacy/unclassified data. */
+  readonly outcomeProvenance?: "simulated" | "authoritative" | "unverified" | null;
 
   /** When our system created this record. */
   readonly createdAt: Date;
@@ -115,6 +132,7 @@ export function createFiscalizationRecord(
     snapshotVersion: input.snapshot?.schemaVersion ?? null,
     outcomeUnknownReason: null,
     status: "Pending",
+    outcomeProvenance: null,
     createdAt: timestamp,
     updatedAt: new Date(timestamp.getTime()),
     receipt: null,

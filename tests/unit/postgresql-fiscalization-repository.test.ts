@@ -47,6 +47,7 @@ function makeRow(overrides: Partial<FiscalizationRecordRow> = {}): Fiscalization
     failureCode: null,
     failureMessage: null,
     outcomeUnknownReason: null,
+    outcomeProvenance: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -54,12 +55,25 @@ function makeRow(overrides: Partial<FiscalizationRecordRow> = {}): Fiscalization
 }
 
 function createHarness() {
-  const prismaMock = {
+  const delegates = {
     fiscalizationRecord: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
       updateMany: vi.fn(),
     },
+    fiscalizationAttempt: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue(undefined),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  };
+  const prismaMock = {
+    ...delegates,
+    $transaction: vi.fn(async (callback: (transaction: typeof delegates) => Promise<unknown>) =>
+      callback(delegates),
+    ),
   };
 
   const prisma = prismaMock as unknown as PrismaClient;
@@ -75,6 +89,35 @@ describe("PostgresqlFiscalizationRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ({ prismaMock, repository } = createHarness());
+  });
+
+  it("queries stable filtered history pages and total counts", async () => {
+    await repository.listHistory({
+      page: 2,
+      pageSize: 10,
+      status: "OutcomeUnknown",
+      etimsStatus: "rejected",
+      correlationId: "correlation-1",
+      createdFrom: now,
+    });
+    expect(prismaMock.fiscalizationRecord.findMany).toHaveBeenCalledWith({
+      where: {
+        status: "OutcomeUnknown",
+        createdAt: { gte: now },
+        etimsReportingOperation: { is: { status: "rejected", correlationId: "correlation-1" } },
+      },
+      include: {
+        deviceAttempts: {
+          orderBy: { attemptNumber: "asc" },
+          select: { attemptNumber: true, outcome: true, errorCode: true },
+        },
+        etimsReportingOperation: { select: { status: true, correlationId: true } },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 10,
+      take: 10,
+    });
+    expect(prismaMock.fiscalizationRecord.count).toHaveBeenCalled();
   });
 
   it("returns a mapped record when the ID exists", async () => {
@@ -138,6 +181,13 @@ describe("PostgresqlFiscalizationRepository", () => {
     });
 
     expect(result?.status).toBe("InProgress");
+    expect(prismaMock.fiscalizationAttempt.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        fiscalizationRequestId: "fiscalization-001",
+        attemptNumber: 1,
+        startedAt: expect.any(Date),
+      }),
+    });
   });
 
   it("returns null when a Pending record cannot be claimed", async () => {
@@ -155,9 +205,9 @@ describe("PostgresqlFiscalizationRepository", () => {
     prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.fiscalizationRecord.findUnique.mockResolvedValue(null);
 
-    const result = await repository.claimPending("fiscalization-001");
-
-    expect(result).toBeNull();
+    await expect(repository.claimPending("fiscalization-001")).rejects.toThrow(
+      "Claimed fiscalization request disappeared.",
+    );
   });
 
   it("saves an outcome only when the record is still InProgress", async () => {
@@ -168,6 +218,7 @@ describe("PostgresqlFiscalizationRepository", () => {
     const inProgress = startFiscalization(pending);
 
     prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.fiscalizationAttempt.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await repository.saveOutcome({
       ...inProgress,
@@ -260,12 +311,14 @@ describe("PostgresqlFiscalizationRepository", () => {
     const staleBefore = new Date("2026-10-23T08:00:00.000Z");
     const reason = "The request was abandoned before its device outcome was saved.";
 
-    prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.fiscalizationRecord.findMany.mockResolvedValue([{ id: "fiscalization-001" }]);
+    prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await repository.markStaleInProgressOutcomeUnknown(staleBefore, reason);
 
     expect(prismaMock.fiscalizationRecord.updateMany).toHaveBeenCalledWith({
       where: {
+        id: "fiscalization-001",
         status: "InProgress",
         updatedAt: {
           lt: staleBefore,
@@ -282,11 +335,15 @@ describe("PostgresqlFiscalizationRepository", () => {
       },
     });
 
-    expect(result).toBe(2);
+    expect(prismaMock.fiscalizationAttempt.updateMany).toHaveBeenCalledWith({
+      where: { fiscalizationRequestId: "fiscalization-001", completedAt: null },
+      data: expect.objectContaining({ outcome: "outcome_unknown", errorMessage: reason }),
+    });
+    expect(result).toBe(1);
   });
 
   it("returns zero when no stale InProgress records are found", async () => {
-    prismaMock.fiscalizationRecord.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.fiscalizationRecord.findMany.mockResolvedValue([]);
 
     const result = await repository.markStaleInProgressOutcomeUnknown(
       new Date("2026-10-23T08:00:00.000Z"),

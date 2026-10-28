@@ -17,7 +17,11 @@ export interface FiscalizationSnapshotInvoice {
     readonly taxName: string | null;
     readonly taxType: string | null;
     readonly taxPercentage: string | null;
+    readonly discountAmount?: string | null | undefined;
   }[];
+  readonly invoiceDate?: string | null | undefined;
+  readonly discount?: string | null | undefined;
+  readonly discountBeforeTax?: boolean | null | undefined;
   readonly subtotal: string;
   readonly taxTotal: string;
   readonly total: string;
@@ -44,6 +48,17 @@ export interface FiscalizationSnapshotLineProfile {
   readonly vatGroupRate: string;
 }
 
+export interface FiscalizationSnapshotPayment {
+  readonly paymentId: string;
+  readonly paymentNumber: string | null;
+  readonly paymentMode: string | null;
+  readonly amount: string;
+  readonly date: string | null;
+  readonly referenceNumber: string | null;
+  readonly description: string | null;
+  readonly source: Readonly<Record<string, unknown>>;
+}
+
 export interface FiscalizationSnapshot {
   readonly schemaVersion: typeof FISCALIZATION_SNAPSHOT_VERSION;
   readonly snapshotId: string;
@@ -52,4 +67,5 @@ export interface FiscalizationSnapshot {
   readonly invoice: FiscalizationSnapshotInvoice;
   readonly customer: FiscalizationSnapshotCustomer;
   readonly lineProfiles: readonly FiscalizationSnapshotLineProfile[];
+  readonly payments?: readonly FiscalizationSnapshotPayment[] | undefined;
 }

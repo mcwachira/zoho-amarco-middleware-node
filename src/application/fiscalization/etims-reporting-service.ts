@@ -16,11 +16,15 @@ import type {
   PreparedEtimsReportingRequest,
 } from "./etims-reporting-adapter.js";
 import type { EtimsReportingRepository } from "./etims-reporting-repository.js";
+import type { EtimsSubmissionPayloadVault } from "./etims-submission-payload-vault.js";
+import type { EtimsSubmissionPayloadRecord } from "./etims-submission-payload.js";
+import { logger } from "../../observability/logger.js";
 
 export interface EtimsReportingServiceOptions {
   readonly enabled: boolean;
   readonly selectedAdapterType?: "vscu" | "oscu";
   readonly verifiedReceiptLifecycle: boolean;
+  readonly reconciliationTimeoutMs?: number;
   readonly now?: () => Date;
   readonly createId?: () => string;
 }
@@ -29,12 +33,14 @@ export interface RegisterEtimsReportingOperationInput {
   readonly fiscalizationRequestId: string;
   readonly zohoInvoiceId: string;
   readonly payloadHash: string;
+  readonly mappingConfigurationDigest?: string;
 }
 
 export interface EtimsReportingReadiness {
   readonly enabled: boolean;
   readonly selectedAdapterType: "vscu" | "oscu" | null;
   readonly status: "not_configured" | "blocked" | "ready";
+  readonly simulated?: boolean;
   readonly blockers: readonly string[];
   readonly capabilities: {
     readonly supportsReconciliation: boolean;
@@ -95,6 +101,7 @@ export class EtimsReportingService {
     private readonly repository: EtimsReportingRepository,
     adapters: readonly EtimsReportingAdapter[],
     private readonly options: EtimsReportingServiceOptions,
+    private readonly payloadVault?: EtimsSubmissionPayloadVault,
   ) {
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
@@ -111,6 +118,7 @@ export class EtimsReportingService {
         enabled: this.options.enabled,
         selectedAdapterType: adapterType,
         status: "not_configured",
+        simulated: false,
         blockers: [
           ...(!this.options.enabled ? ["reporting_disabled"] : []),
           ...(adapterType === null
@@ -136,6 +144,7 @@ export class EtimsReportingService {
         enabled: true,
         selectedAdapterType: adapterType,
         status: "blocked",
+        simulated: false,
         blockers: ["selected_adapter_unavailable"],
         capabilities: {
           supportsReconciliation: false,
@@ -154,6 +163,7 @@ export class EtimsReportingService {
       enabled: this.options.enabled,
       selectedAdapterType: adapterType,
       status: operational ? "ready" : "blocked",
+      simulated: adapter.status.simulated === true,
       blockers: operational
         ? []
         : [
@@ -173,6 +183,19 @@ export class EtimsReportingService {
     return this.repository.findByFiscalizationRequestId(fiscalizationRequestId);
   }
 
+  async listReconciliationCandidates(
+    limit: number,
+  ): Promise<readonly EtimsReportingOperationDetails[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new Error("eTIMS reconciliation batch size must be between 1 and 100.");
+    }
+    const readiness = this.getReadiness();
+    if (readiness.status !== "ready" || !readiness.capabilities.supportsReconciliation) {
+      return [];
+    }
+    return this.repository.findReconciliationCandidates(limit);
+  }
+
   async register(input: RegisterEtimsReportingOperationInput): Promise<EtimsReportingOperation> {
     const fiscalizationRequestId = input.fiscalizationRequestId.trim();
     const zohoInvoiceId = input.zohoInvoiceId.trim();
@@ -181,6 +204,12 @@ export class EtimsReportingService {
     }
     if (!isSha256(input.payloadHash)) {
       throw new Error("eTIMS payload hash must be a SHA-256 hexadecimal digest.");
+    }
+    if (
+      input.mappingConfigurationDigest !== undefined &&
+      !isSha256(input.mappingConfigurationDigest)
+    ) {
+      throw new Error("KRA mapping configuration digest must be a SHA-256 hexadecimal digest.");
     }
 
     const readiness = this.getReadiness();
@@ -196,16 +225,27 @@ export class EtimsReportingService {
         ? readiness.selectedAdapterType
         : null;
     const adapter = adapterType ? this.adapterByType.get(adapterType) : undefined;
+    const adapterConfigurationId = adapter?.status.configurationId ?? null;
+    const persistedConfigurationId = input.mappingConfigurationDigest
+      ? `${adapterConfigurationId ?? "adapter-unselected"}|mapping-sha256:${input.mappingConfigurationDigest}`
+      : adapterConfigurationId;
+    if (persistedConfigurationId && persistedConfigurationId.length > 255) {
+      throw new Error(
+        "Combined provider and mapping configuration identity exceeds storage limits.",
+      );
+    }
     const operation: EtimsReportingOperation = {
       id: this.createId(),
       fiscalizationRequestId,
       zohoInvoiceId,
       adapterType,
-      adapterConfigurationId: adapter?.status.configurationId ?? null,
+      adapterConfigurationId: persistedConfigurationId,
+      simulated: adapter ? adapter.status.simulated === true : null,
       correlationId: this.createId(),
       status,
       payloadHash: input.payloadHash.toLowerCase(),
       attemptNumber: 0,
+      reconciliationAttemptNumber: 0,
       providerReference: null,
       providerMetadataJson: null,
       errorCategory: readiness.blockers[0] ?? null,
@@ -218,12 +258,18 @@ export class EtimsReportingService {
     return operation;
   }
 
-  async submit(id: string, payload: unknown): Promise<EtimsReportingOperationDetails> {
+  async submit(
+    id: string,
+    payload: unknown,
+    signal?: AbortSignal,
+    mappingConfiguration?: unknown,
+  ): Promise<EtimsReportingOperationDetails> {
     const details = await this.requireOperation(id);
     const operation = details.operation;
     if (operation.status !== "pending" || operation.adapterType === null) {
       return details;
     }
+    if (signal?.aborted) return details;
     const adapter = this.adapterByType.get(operation.adapterType);
     if (
       !adapter ||
@@ -243,14 +289,33 @@ export class EtimsReportingService {
       return this.blockPending(operation, blockers);
     }
 
-    const claimed = await this.repository.claimPending(id, this.now());
+    if (!this.payloadVault) {
+      return this.blockPending(operation, ["durable_submission_payload_storage_unavailable"]);
+    }
+    if (
+      operation.adapterConfigurationId?.includes("|mapping-sha256:") &&
+      mappingConfiguration === undefined
+    ) {
+      return this.blockPending(operation, ["historical_mapping_configuration_unavailable"]);
+    }
+    let payloadRecord: EtimsSubmissionPayloadRecord;
+    try {
+      payloadRecord = this.payloadVault.prepare(details, payload, this.now(), mappingConfiguration);
+    } catch {
+      return this.blockPending(operation, ["durable_submission_payload_invalid_or_unavailable"]);
+    }
+    const claimed = await this.repository.claimPending({
+      operationId: id,
+      now: this.now(),
+      payload: payloadRecord,
+    });
     if (!claimed) {
       return this.requireOperation(id);
     }
 
     let result: EtimsAdapterSubmissionResult;
     try {
-      result = await adapter.submit(request);
+      result = await adapter.submit(request, signal);
     } catch {
       result = {
         kind: "outcome_unknown",
@@ -261,7 +326,59 @@ export class EtimsReportingService {
     return this.persistResult(claimed, result);
   }
 
-  async reconcile(id: string, payload: unknown): Promise<EtimsReportingOperationDetails> {
+  /** Validates a mapped submission and encrypted archive before another stage runs. */
+  async preflightSubmission(
+    id: string,
+    payload: unknown,
+    mappingConfiguration: unknown,
+  ): Promise<readonly string[]> {
+    const details = await this.requireOperation(id);
+    if (details.operation.status !== "pending") return [];
+    const operation = details.operation;
+    const adapter = operation.adapterType
+      ? this.adapterByType.get(operation.adapterType)
+      : undefined;
+    if (
+      !adapter ||
+      !this.options.enabled ||
+      !this.options.verifiedReceiptLifecycle ||
+      !adapter.status.configured ||
+      !adapter.status.contractVerified ||
+      !adapter.status.operational
+    ) {
+      return adapter?.status.blockers.length
+        ? adapter.status.blockers
+        : ["selected_adapter_unavailable"];
+    }
+    if (!this.payloadVault) return ["durable_submission_payload_storage_unavailable"];
+    let preparedRequest: PreparedEtimsReportingRequest;
+    try {
+      preparedRequest = this.toRequest(operation, payload);
+    } catch {
+      return ["prepared_payload_invalid"];
+    }
+    try {
+      const blockers = await adapter.validate(preparedRequest);
+      if (blockers.length > 0) return blockers;
+    } catch {
+      return ["adapter_validation_unavailable"];
+    }
+    try {
+      this.payloadVault.prepare(details, payload, this.now(), mappingConfiguration);
+    } catch {
+      return ["durable_submission_payload_invalid_or_unavailable"];
+    }
+    return [];
+  }
+
+  async reconcile(
+    id: string,
+    payload: unknown,
+    signal?: AbortSignal,
+  ): Promise<EtimsReportingOperationDetails> {
+    if (signal?.aborted) {
+      return this.requireOperation(id);
+    }
     const details = await this.requireOperation(id);
     const operation = details.operation;
     if (operation.status !== "outcome_unknown" && operation.status !== "reconciliation_required") {
@@ -283,32 +400,85 @@ export class EtimsReportingService {
     }
 
     const request = this.toRequest(operation, payload);
-    const reconciling =
-      operation.status === "outcome_unknown"
-        ? await this.transition(operation, "reconciliation_required", {
-            reconciliationRequired: true,
-            errorCategory: "reconciliation_started",
-            errorMessage: "Provider reconciliation is required; no resubmission was performed.",
-          })
-        : { operation, attempts: details.attempts };
-    if (!reconciling) {
+    const claimed = await this.repository.claimReconciliation(id, operation.status, this.now());
+    if (!claimed) {
       return this.requireOperation(id);
     }
 
     let result: EtimsAdapterReconciliationResult;
+    const timeoutMs = this.options.reconciliationTimeoutMs ?? 15_000;
+    const abortController = new AbortController();
+    const abortFromCaller = () => abortController.abort();
+    signal?.addEventListener("abort", abortFromCaller, { once: true });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      result = await adapter.reconcile(request);
+      const timeoutResult = new Promise<EtimsAdapterReconciliationResult>((resolve) => {
+        timeout = setTimeout(() => {
+          abortController.abort();
+          resolve({ kind: "outcome_unknown", safeMessage: "Provider reconciliation timed out." });
+        }, timeoutMs);
+        timeout.unref();
+      });
+      const abortResult = new Promise<EtimsAdapterReconciliationResult>((resolve) => {
+        if (signal?.aborted) {
+          resolve({ kind: "outcome_unknown", safeMessage: "Reconciliation was cancelled." });
+          return;
+        }
+        signal?.addEventListener(
+          "abort",
+          () => resolve({ kind: "outcome_unknown", safeMessage: "Reconciliation was cancelled." }),
+          { once: true },
+        );
+      });
+      const providerResult = Promise.resolve(adapter.reconcile(request, abortController.signal));
+      const rawResult: unknown = await Promise.race([providerResult, timeoutResult, abortResult]);
+      result = isReconciliationResult(rawResult)
+        ? rawResult
+        : {
+            kind: "outcome_unknown",
+            safeMessage: "The provider reconciliation response could not be validated.",
+          };
     } catch {
       result = {
         kind: "outcome_unknown",
         safeMessage: "The provider reconciliation result could not be confirmed.",
       };
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      signal?.removeEventListener("abort", abortFromCaller);
     }
-    return this.persistReconciliationResult(reconciling.operation, result, adapter);
+    return this.persistReconciliationResult(claimed, result, adapter);
   }
 
   async recoverStaleInProgress(staleBefore: Date): Promise<number> {
-    return this.repository.markStaleInProgressOutcomeUnknown(staleBefore, this.now());
+    const now = this.now();
+    const [submissions, reconciliations] = await Promise.all([
+      this.repository.markStaleInProgressOutcomeUnknown(staleBefore, now),
+      this.repository.markStaleReconciliationRequired(staleBefore, now),
+    ]);
+    return submissions + reconciliations;
+  }
+
+  async blockReconciliation(
+    id: string,
+    errorCategory: string,
+    safeMessage: string,
+  ): Promise<EtimsReportingOperationDetails> {
+    const current = await this.requireOperation(id);
+    if (
+      current.operation.status !== "outcome_unknown" &&
+      current.operation.status !== "reconciliation_required"
+    ) {
+      return current;
+    }
+    const blocked = await this.transition(current.operation, "blocked", {
+      providerReference: current.operation.providerReference,
+      providerMetadataJson: current.operation.providerMetadataJson,
+      errorCategory: sanitizedText(errorCategory, 100),
+      errorMessage: sanitizedText(safeMessage),
+      reconciliationRequired: false,
+    });
+    return blocked ?? this.requireOperation(id);
   }
 
   private async requireOperation(id: string): Promise<EtimsReportingOperationDetails> {
@@ -401,20 +571,26 @@ export class EtimsReportingService {
           safeMessage: "The provider result could not be confirmed.",
         };
     const next: EtimsReportingState =
-      result.kind === "accepted"
-        ? "accepted"
-        : result.kind === "rejected"
-          ? "rejected"
-          : "outcome_unknown";
+      result.kind === "not_submitted"
+        ? "blocked"
+        : result.kind === "accepted"
+          ? "accepted"
+          : result.kind === "rejected"
+            ? "rejected"
+            : "outcome_unknown";
     const now = this.now();
     const operation: EtimsReportingOperation = {
       ...claimed,
       status: next,
       providerReference:
-        result.kind === "outcome_unknown" ? null : safeProviderReference(result.providerReference),
+        result.kind === "accepted" || result.kind === "rejected"
+          ? safeProviderReference(result.providerReference)
+          : null,
       providerMetadataJson:
-        result.kind === "outcome_unknown" ? null : safeJson(result.safeMetadataJson),
-      errorCategory: result.kind === "accepted" ? null : result.errorCategory,
+        result.kind === "accepted" || result.kind === "rejected"
+          ? safeJson(result.safeMetadataJson)
+          : null,
+      errorCategory: result.kind === "accepted" ? null : sanitizedText(result.errorCategory, 100),
       errorMessage: result.kind === "accepted" ? null : sanitizedText(result.safeMessage),
       reconciliationRequired: result.kind === "outcome_unknown",
       updatedAt: now,
@@ -423,6 +599,7 @@ export class EtimsReportingService {
     const attempt: EtimsReportingAttempt = {
       id: this.createId(),
       operationId: claimed.id,
+      attemptType: "submission",
       attemptNumber: claimed.attemptNumber,
       startedAt: claimed.updatedAt,
       completedAt: now,
@@ -436,6 +613,25 @@ export class EtimsReportingService {
     if (!saved) {
       throw new Error("The eTIMS submission outcome could not be persisted.");
     }
+    if (next !== "accepted") {
+      logger.warn(
+        {
+          requestId: claimed.fiscalizationRequestId,
+          operationId: claimed.id,
+          adapterType: claimed.adapterType,
+          outcome: next,
+          category:
+            next === "rejected"
+              ? "provider_rejected"
+              : result.kind === "outcome_unknown" && result.errorCategory === "timeout"
+                ? "timeout"
+                : next === "blocked"
+                  ? "not_submitted"
+                  : "uncertain_outcome",
+        },
+        "eTIMS adapter returned a non-success outcome",
+      );
+    }
     return this.requireOperation(claimed.id);
   }
 
@@ -444,46 +640,71 @@ export class EtimsReportingService {
     result: EtimsAdapterReconciliationResult,
     adapter: EtimsReportingAdapter,
   ): Promise<EtimsReportingOperationDetails> {
-    if (result.kind === "outcome_unknown") {
-      const updated = await this.repository.transition(operation.id, "reconciliation_required", {
-        ...operation,
-        errorCategory: "reconciliation_unknown",
-        errorMessage: sanitizedText(result.safeMessage),
-        updatedAt: this.now(),
-      });
-      return updated ? this.requireOperation(operation.id) : this.requireOperation(operation.id);
-    }
-    if (result.kind === "confirmed_not_found") {
+    let status: EtimsReportingState;
+    let providerReference = operation.providerReference;
+    let providerMetadataJson = operation.providerMetadataJson;
+    let errorCategory: string | null;
+    let errorMessage: string | null;
+    let reconciliationRequired = false;
+
+    if (result.kind === "outcome_unknown" || result.kind === "pending") {
+      status = "reconciliation_required";
+      errorCategory = result.kind === "pending" ? "provider_pending" : "reconciliation_unknown";
+      errorMessage = sanitizedText(result.safeMessage);
+      reconciliationRequired = true;
+    } else if (result.kind === "confirmed_not_found") {
       const maySafelyRetry =
         adapter.status.capabilities.safeResubmissionAfterConfirmedNotFound === true;
-      if (!maySafelyRetry) {
-        return this.requireOperation(operation.id);
-      }
-      const transitioned = await this.transition(operation, "pending", {
-        providerReference: operation.providerReference,
-        providerMetadataJson: operation.providerMetadataJson,
-        errorCategory: "confirmed_not_found",
-        errorMessage:
-          "Provider confirmed no transaction; explicit operator resubmission is required.",
-        reconciliationRequired: false,
-      });
-      return transitioned ?? this.requireOperation(operation.id);
+      status = maySafelyRetry ? "pending" : "reconciliation_required";
+      errorCategory = maySafelyRetry ? "confirmed_not_found" : "resubmission_not_verified";
+      errorMessage = maySafelyRetry
+        ? "Provider confirmed no transaction; an explicit submit call is required."
+        : "The provider confirmed no transaction; safe resubmission is not verified.";
+      reconciliationRequired = !maySafelyRetry;
+    } else {
+      status = result.kind;
+      providerReference = safeProviderReference(result.providerReference);
+      providerMetadataJson = safeJson(result.safeMetadataJson);
+      errorCategory = result.kind === "rejected" ? sanitizedText(result.errorCategory, 100) : null;
+      errorMessage = result.kind === "rejected" ? sanitizedText(result.safeMessage) : null;
     }
 
-    const next = result.kind;
+    const now = this.now();
     const updated: EtimsReportingOperation = {
       ...operation,
-      status: next,
-      providerReference: safeProviderReference(result.providerReference),
-      providerMetadataJson: safeJson(result.safeMetadataJson),
-      errorCategory: result.kind === "rejected" ? result.errorCategory : null,
-      errorMessage: result.kind === "rejected" ? sanitizedText(result.safeMessage) : null,
-      reconciliationRequired: false,
-      updatedAt: this.now(),
+      status,
+      providerReference,
+      providerMetadataJson,
+      errorCategory,
+      errorMessage,
+      reconciliationRequired,
+      updatedAt: now,
     };
-    assertEtimsReportingTransition(operation.status, next);
-    const saved = await this.repository.transition(operation.id, operation.status, updated);
-    return saved ? this.requireOperation(operation.id) : this.requireOperation(operation.id);
+    assertEtimsReportingTransition("reconciling", status);
+    const attempt: EtimsReportingAttempt = {
+      id: this.createId(),
+      operationId: operation.id,
+      attemptType: "reconciliation",
+      attemptNumber: operation.reconciliationAttemptNumber,
+      startedAt: operation.updatedAt,
+      completedAt: now,
+      outcome:
+        result.kind === "accepted" || result.kind === "rejected"
+          ? result.kind
+          : result.kind === "confirmed_not_found"
+            ? "confirmed_not_found"
+            : result.kind === "pending"
+              ? "pending"
+              : "outcome_unknown",
+      providerReference,
+      errorCategory,
+      errorMessage,
+    };
+    const saved = await this.repository.completeAttempt(updated, attempt);
+    if (!saved) {
+      throw new Error("The eTIMS reconciliation outcome could not be persisted.");
+    }
+    return this.requireOperation(operation.id);
   }
 }
 
@@ -510,6 +731,13 @@ function isSubmissionResult(value: unknown): value is EtimsAdapterSubmissionResu
   const providerReference = result["providerReference"];
   const safeMetadataJson = result["safeMetadataJson"];
   if (
+    kind === "not_submitted" &&
+    typeof result["errorCategory"] === "string" &&
+    typeof result["safeMessage"] === "string"
+  ) {
+    return true;
+  }
+  if (
     kind === "accepted" &&
     (providerReference === null || typeof providerReference === "string") &&
     (safeMetadataJson === null || typeof safeMetadataJson === "string")
@@ -529,6 +757,37 @@ function isSubmissionResult(value: unknown): value is EtimsAdapterSubmissionResu
     );
   }
   return false;
+}
+
+function isReconciliationResult(value: unknown): value is EtimsAdapterReconciliationResult {
+  if (typeof value !== "object" || value === null || !("kind" in value)) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  const kind = result["kind"];
+  const providerReference = result["providerReference"];
+  const safeMetadataJson = result["safeMetadataJson"];
+  if (
+    kind === "accepted" &&
+    (providerReference === null || typeof providerReference === "string") &&
+    (safeMetadataJson === null || typeof safeMetadataJson === "string")
+  ) {
+    return true;
+  }
+  if (kind === "rejected") {
+    return (
+      typeof result["errorCategory"] === "string" &&
+      typeof result["safeMessage"] === "string" &&
+      (providerReference === null || typeof providerReference === "string") &&
+      (safeMetadataJson === null || typeof safeMetadataJson === "string")
+    );
+  }
+  if (kind === "confirmed_not_found") {
+    return true;
+  }
+  return (
+    (kind === "outcome_unknown" || kind === "pending") && typeof result["safeMessage"] === "string"
+  );
 }
 
 function safeProviderReference(reference: string | null): string | null {
